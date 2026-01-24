@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS - Security Assessment Framework</title>
+    <meta name="description" content="Advanced Testing Lab for Application Security - Guided Vulnerability Assessment">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    <div id="app">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">ATLAS</h1>
+                <span class="tagline">Security Assessment</span>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-item active" data-page="dashboard">
+                    <span class="nav-icon"></span>
+                    Dashboard
+                </a>
+                <a href="#new-scan" class="nav-item" data-page="new-scan">
+                    <span class="nav-icon"></span>
+                    New Scan
+                </a>
+                <a href="#checks" class="nav-item" data-page="checks">
+                    <span class="nav-icon"></span>
+                    Vulnerability Checks
+                </a>
+                <a href="#demo" class="nav-item" data-page="demo">
+                    <span class="nav-icon"></span>
+                    Demo Targets
+                </a>
+                <a href="#reports" class="nav-item" data-page="reports">
+                    <span class="nav-icon"></span>
+                    Reports
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="api-status">
+                    <span class="status-dot"></span>
+                    <span id="api-status-text">Connecting...</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Page -->
+            <section id="page-dashboard" class="page active">
+                <header class="page-header">
+                    <h2>Dashboard</h2>
+                    <button class="btn btn-primary" onclick="showPage('new-scan')">
+                        + New Scan
+                    </button>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="stat-total-scans">0</div>
+                        <div class="stat-label">Total Scans</div>
+                    </div>
+                    <div class="stat-card stat-critical">
+                        <div class="stat-value" id="stat-critical">0</div>
+                        <div class="stat-label">Critical</div>
+                    </div>
+                    <div class="stat-card stat-high">
+                        <div class="stat-value" id="stat-high">0</div>
+                        <div class="stat-label">High</div>
+                    </div>
+                    <div class="stat-card stat-medium">
+                        <div class="stat-value" id="stat-medium">0</div>
+                        <div class="stat-label">Medium</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Recent Scans</h3>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Target</th>
+                                    <th>Status</th>
+                                    <th>Phase</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scans-table-body">
+                                <tr>
+                                    <td colspan="6" class="empty-state">No scans yet. Start your first scan!</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- New Scan Page -->
+            <section id="page-new-scan" class="page">
+                <header class="page-header">
+                    <h2>New Vulnerability Assessment</h2>
+                </header>
+
+                <div class="scan-wizard">
+                    <!-- Step Indicator -->
+                    <div class="steps-indicator">
+                        <div class="step active" data-step="1">
+                            <span class="step-number">1</span>
+                            <span class="step-label">Target</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step" data-step="2">
+                            <span class="step-number">2</span>
+                            <span class="step-label">Recon</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step" data-step="3">
+                            <span class="step-number">3</span>
+                            <span class="step-label">Select Checks</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step" data-step="4">
+                            <span class="step-number">4</span>
+                            <span class="step-label">Execute</span>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step" data-step="5">
+                            <span class="step-number">5</span>
+                            <span class="step-label">Results</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 1: Target Input -->
+                    <div class="wizard-step active" id="step-target">
+                        <div class="card">
+                            <h3>Enter Target</h3>
+                            <p class="card-description">Provide the URL or IP address of the target application.</p>
+
+                            <div class="form-group">
+                                <label for="target-input">Target URL or IP</label>
+                                <input type="text" id="target-input" class="form-input"
+                                    placeholder="http://localhost:3000 or 192.168.1.100" autocomplete="off">
+                                <small class="form-hint">Example: http://juice-shop:3000</small>
+                            </div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-primary" onclick="startScan()">
+                                    Start Reconnaissance →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Reconnaissance -->
+                    <div class="wizard-step" id="step-recon">
+                        <div class="card">
+                            <h3>Reconnaissance in Progress</h3>
+                            <div class="progress-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="recon-progress"></div>
+                                </div>
+                                <p class="progress-text" id="recon-status">Scanning ports and services...</p>
+                            </div>
+                        </div>
+
+                        <div class="card" id="recon-results-card" style="display: none;">
+                            <h3>Discovered Services</h3>
+                            <div class="fingerprint-badge" id="fingerprint-badge" style="display: none;"></div>
+                            <div class="services-grid" id="services-list"></div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-primary" onclick="proceedToSelection()">
+                                    Select Checks →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Check Selection -->
+                    <div class="wizard-step" id="step-selection">
+                        <div class="card">
+                            <h3>Select Vulnerability Checks</h3>
+                            <p class="card-description">Choose which security checks to run against the target.</p>
+
+                            <div class="selection-controls">
+                                <button class="btn btn-sm" onclick="selectAllChecks()">Select All</button>
+                                <button class="btn btn-sm btn-secondary" onclick="deselectAllChecks()">Deselect
+                                    All</button>
+                                <span class="selection-count"><span id="selected-count">0</span> selected</span>
+                            </div>
+
+                            <div class="checks-categories" id="checks-list"></div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-secondary" onclick="goToStep(2)">← Back</button>
+                                <button class="btn btn-primary" onclick="executeChecks()">
+                                    Execute Checks →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Execution -->
+                    <div class="wizard-step" id="step-execution">
+                        <div class="card">
+                            <h3>Executing Vulnerability Checks</h3>
+                            <div class="progress-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" id="exec-progress"></div>
+                                </div>
+                                <p class="progress-text">
+                                    <span id="exec-current">0</span> / <span id="exec-total">0</span> checks completed
+                                </p>
+                            </div>
+
+                            <div class="execution-log" id="execution-log"></div>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: Results -->
+                    <div class="wizard-step" id="step-results">
+                        <div class="card">
+                            <h3>Scan Complete</h3>
+
+                            <div class="results-summary">
+                                <div class="summary-stat critical">
+                                    <span class="summary-value" id="result-critical">0</span>
+                                    <span class="summary-label">Critical</span>
+                                </div>
+                                <div class="summary-stat high">
+                                    <span class="summary-value" id="result-high">0</span>
+                                    <span class="summary-label">High</span>
+                                </div>
+                                <div class="summary-stat medium">
+                                    <span class="summary-value" id="result-medium">0</span>
+                                    <span class="summary-label">Medium</span>
+                                </div>
+                                <div class="summary-stat low">
+                                    <span class="summary-value" id="result-low">0</span>
+                                    <span class="summary-label">Low</span>
+                                </div>
+                            </div>
+
+                            <div class="findings-list" id="findings-list"></div>
+
+                            <div class="form-actions">
+                                <button class="btn btn-secondary" onclick="showPage('dashboard')">
+                                    ← Dashboard
+                                </button>
+                                <button class="btn btn-primary" onclick="downloadReport()">
+                                    Download Report
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Checks Page -->
+            <section id="page-checks" class="page">
+                <header class="page-header">
+                    <h2>Available Vulnerability Checks</h2>
+                </header>
+
+                <div class="card">
+                    <div class="checks-summary" id="checks-summary"></div>
+                    <div class="all-checks-list" id="all-checks-list"></div>
+                </div>
+            </section>
+
+            <!-- Demo Targets Page -->
+            <section id="page-demo" class="page">
+                <header class="page-header">
+                    <h2>🎯 Demo Targets</h2>
+                </header>
+
+                <div class="card">
+                    <h3>Available Preset Targets</h3>
+                    <p class="card-description">Select a pre-configured vulnerable application to test with known
+                        vulnerabilities.</p>
+                    <div id="presets-grid" class="presets-grid"></div>
+                </div>
+            </section>
+
+            <!-- Reports Page -->
+            <section id="page-reports" class="page">
+                <header class="page-header">
+                    <h2>Reports</h2>
+                </header>
+
+                <div class="card">
+                    <p class="empty-state">Select a completed scan from the dashboard to view its report.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <p id="loading-text">Loading...</p>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>
