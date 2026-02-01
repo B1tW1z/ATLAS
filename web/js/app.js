@@ -10,13 +10,30 @@ const API_BASE = '/api';
 let currentScanId = null;
 let selectedChecks = new Set();
 let allChecks = [];
+let currentUser = null;
 
 // ========== Initialization ==========
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check authentication first
+    const isAuthenticated = await checkAuthentication();
+
+    if (!isAuthenticated) {
+        window.location.href = '/login';
+        return;
+    }
+
     initNavigation();
     checkApiStatus();
     loadDashboard();
+
+    // Close user menu when clicking outside
+    document.addEventListener('click', (e) => {
+        const userProfile = document.getElementById('user-profile');
+        if (userProfile && !userProfile.contains(e.target)) {
+            userProfile.classList.remove('open');
+        }
+    });
 });
 
 function initNavigation() {
@@ -501,14 +518,19 @@ async function loadReports() {
                                 <td><span class="status-${scan.status}">${scan.status}</span></td>
                                 <td>
                                     <button class="btn btn-sm" onclick="downloadReportId('${scan.id}')">Download</button>
-                                    <button class="btn btn-sm btn-secondary" style="color: var(--severity-critical); border-color: var(--severity-critical);" onclick="deleteReport('${scan.id}')">Delete</button>
+                                    <button class="btn btn-sm btn-secondary delete-btn" data-role="admin" style="color: var(--severity-critical); border-color: var(--severity-critical);" onclick="deleteReport('${scan.id}')">Delete</button>
                                 </td>
                             </tr>
                         `).join('')}
-                    </tbody>
+                </tbody>
                 </table>
             </div>
         `;
+
+        // Re-apply role visibility for dynamically loaded content
+        if (currentUser) {
+            applyRoleVisibility(currentUser.role);
+        }
     } catch (error) {
         console.error('Failed to load reports:', error);
     }
@@ -676,4 +698,150 @@ async function resumeScan(scanId) {
     } catch (error) {
         alert('Failed to resume scan: ' + error.message);
     }
+}
+
+// ========== Authentication & User Profile ==========
+
+/**
+ * Check if user is authenticated and load user profile
+ */
+async function checkAuthentication() {
+    // First try to get user from localStorage
+    const storedUser = localStorage.getItem('atlas_user');
+    if (storedUser) {
+        try {
+            currentUser = JSON.parse(storedUser);
+            updateUserProfile(currentUser);
+            applyRoleVisibility(currentUser.role);
+        } catch (e) {
+            console.error('Failed to parse stored user:', e);
+        }
+    }
+
+    // Then verify with server (but don't block if it fails)
+    try {
+        const response = await fetch('/api/auth/verify', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('atlas_token') || ''}`
+            },
+            credentials: 'include'  // Include cookies
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            currentUser = data.user;
+
+            // Store updated user data
+            localStorage.setItem('atlas_user', JSON.stringify(currentUser));
+
+            // Update user profile UI
+            updateUserProfile(currentUser);
+
+            // Apply role-based visibility
+            applyRoleVisibility(currentUser.role);
+
+            return true;
+        }
+    } catch (error) {
+        console.error('Auth verify failed:', error);
+    }
+
+    // If we have a stored user, allow access (for demo purposes)
+    if (currentUser) {
+        return true;
+    }
+
+    // No authentication, return false
+    return false;
+}
+
+/**
+ * Update user profile section in sidebar
+ */
+function updateUserProfile(user) {
+    const avatarEl = document.getElementById('user-avatar');
+    const nameEl = document.getElementById('user-name');
+    const roleBadgeEl = document.getElementById('user-role-badge');
+
+    if (avatarEl && user.name) {
+        // Get initials
+        const initials = user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        avatarEl.textContent = initials;
+    }
+
+    if (nameEl) {
+        nameEl.textContent = user.name || user.username || 'User';
+    }
+
+    if (roleBadgeEl) {
+        // Map roles to display text
+        const roleMap = {
+            'admin': 'Administrator',
+            'analyst': 'Analyst',
+            'pentester': 'Pen Tester'
+        };
+        const roleText = roleMap[user.role] || 'Pen Tester';
+        roleBadgeEl.textContent = roleText;
+        roleBadgeEl.classList.remove('admin', 'pentester', 'analyst');
+        roleBadgeEl.classList.add(user.role === 'admin' ? 'admin' : 'pentester');
+    }
+}
+
+/**
+ * Toggle user dropdown menu
+ */
+function toggleUserMenu() {
+    const userProfile = document.getElementById('user-profile');
+    if (userProfile) {
+        userProfile.classList.toggle('open');
+    }
+}
+
+/**
+ * Apply role-based visibility to UI elements
+ * data-role can be: "admin", "pentester", "analyst", or comma-separated list like "pentester,admin"
+ */
+function applyRoleVisibility(role) {
+    document.querySelectorAll('[data-role]').forEach(el => {
+        const allowedRoles = el.dataset.role.split(',').map(r => r.trim());
+
+        if (allowedRoles.includes(role)) {
+            // User has permission - show element
+            el.classList.remove('hidden');
+        } else {
+            // User doesn't have permission - hide element
+            el.classList.add('hidden');
+        }
+    });
+}
+
+/**
+ * Handle user logout
+ */
+async function handleLogout() {
+    try {
+        await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('atlas_token') || ''}`
+            }
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+
+    // Clear local storage
+    localStorage.removeItem('atlas_token');
+    localStorage.removeItem('atlas_user');
+
+    // Redirect to login
+    window.location.href = '/login';
+}
+
+/**
+ * Show profile modal (placeholder)
+ */
+function showProfileModal() {
+    const user = currentUser || {};
+    alert(`Profile\n\nName: ${user.name || 'N/A'}\nUsername: ${user.username || 'N/A'}\nRole: ${user.role || 'N/A'}`);
 }

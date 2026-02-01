@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - ATLAS Security Assessment</title>
+    <meta name="description" content="Create an ATLAS account - Advanced Testing Lab for Application Security">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    <div class="login-page">
+        <div class="login-container signup-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <h1 class="login-title">ATLAS</h1>
+                    <p class="login-subtitle">Create Your Account</p>
+                </div>
+
+                <div id="signup-error" class="login-error"></div>
+                <div id="signup-success" class="signup-success"></div>
+
+                <form id="signup-form" class="login-form">
+                    <div class="input-group">
+                        <label for="name">Full Name</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <input type="text" id="name" name="name" class="login-input"
+                                placeholder="Enter your full name" autocomplete="name" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="username">Username</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <input type="text" id="username" name="username" class="login-input"
+                                placeholder="Choose a username" autocomplete="username" pattern="[a-zA-Z0-9_]+"
+                                minlength="3" required>
+                        </div>
+                        <small class="input-hint">Letters, numbers, and underscores only</small>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="email">Email Address</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <input type="email" id="email" name="email" class="login-input"
+                                placeholder="Enter your email" autocomplete="email" required>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="password">Password</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                            <input type="password" id="password" name="password" class="login-input"
+                                placeholder="Create a password" autocomplete="new-password" minlength="8" required>
+                            <button type="button" id="password-toggle" class="password-toggle"
+                                aria-label="Toggle password visibility">
+                                <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor" width="18" height="18">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="password-strength" id="password-strength"></div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="confirm-password">Confirm Password</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                            <input type="password" id="confirm-password" name="confirm-password" class="login-input"
+                                placeholder="Confirm your password" autocomplete="new-password" required>
+                        </div>
+                        <small class="input-hint password-match" id="password-match"></small>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="user-type">User Type</label>
+                        <select id="user-type" name="user-type" class="login-input select-input" required>
+                            <option value="" disabled selected>Select your role</option>
+                            <option value="analyst">Security Analyst</option>
+                            <option value="pentester">Penetration Tester</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group terms-group">
+                        <label>Terms and Conditions</label>
+                        <div class="terms-container" id="terms-container">
+                            <div class="terms-content" id="terms-content">
+                                <h4>ATLAS Security Assessment Framework</h4>
+                                <h5>Terms and Conditions of Use</h5>
+                                <p><strong>Last Updated:</strong> February 2026</p>
+
+                                <h5>1. Acceptance of Terms</h5>
+                                <p>By accessing and using ATLAS ("the Platform"), you agree to be bound by these Terms
+                                    and Conditions. If you do not agree with any part of these terms, you must not use
+                                    the Platform.</p>
+
+                                <h5>2. Educational Purpose</h5>
+                                <p>ATLAS is designed exclusively for educational purposes and authorized security
+                                    testing. You agree to use this tool only on systems you own or have explicit written
+                                    permission to test.</p>
+
+                                <h5>3. Prohibited Activities</h5>
+                                <p>You agree NOT to:</p>
+                                <ul>
+                                    <li>Use ATLAS to attack systems without proper authorization</li>
+                                    <li>Attempt to gain unauthorized access to any network or system</li>
+                                    <li>Use the Platform for any illegal or malicious activities</li>
+                                    <li>Share your account credentials with unauthorized users</li>
+                                    <li>Reverse engineer or attempt to extract source code</li>
+                                </ul>
+
+                                <h5>4. User Responsibilities</h5>
+                                <p>As a user you are responsible for:</p>
+                                <ul>
+                                    <li>Obtaining proper written authorization before testing any system</li>
+                                    <li>Maintaining the confidentiality of your account</li>
+                                    <li>Reporting any vulnerabilities discovered responsibly</li>
+                                    <li>Complying with all applicable laws and regulations</li>
+                                </ul>
+
+                                <h5>5. Limitation of Liability</h5>
+                                <p>ATLAS is provided "as is" without warranties of any kind. The developers shall not be
+                                    liable for any damages arising from the use or inability to use the Platform.</p>
+
+                                <h5>6. Legal Compliance</h5>
+                                <p>You agree to comply with all applicable local, state, national, and international
+                                    laws regarding computer security and ethical hacking practices.</p>
+
+                                <h5>7. Account Termination</h5>
+                                <p>We reserve the right to terminate accounts that violate these terms without prior
+                                    notice.</p>
+
+                                <h5>8. Changes to Terms</h5>
+                                <p>We may modify these terms at any time. Continued use after changes constitutes
+                                    acceptance of modified terms.</p>
+
+                                <p class="terms-end-marker"><strong>— End of Terms and Conditions —</strong></p>
+                            </div>
+                        </div>
+                        <div class="terms-checkbox-wrapper">
+                            <label class="terms-checkbox" id="terms-label">
+                                <input type="checkbox" id="terms-accept" name="terms-accept" disabled required>
+                                <span class="checkbox-text">I have read and agree to the Terms and Conditions</span>
+                            </label>
+                            <small class="input-hint" id="terms-hint">Please scroll to the end of the Terms and
+                                Conditions to enable this checkbox</small>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="login-btn" id="signup-btn" disabled>
+                        Create Account
+                    </button>
+
+                    <div class="divider">
+                        <span>or</span>
+                    </div>
+
+                    <button type="button" class="google-btn" id="google-signup-btn">
+                        <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path fill="#4285F4"
+                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                            <path fill="#34A853"
+                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                            <path fill="#FBBC05"
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                            <path fill="#EA4335"
+                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                        </svg>
+                        Sign up with Google
+                    </button>
+
+                    <button type="button" class="microsoft-btn" id="microsoft-signup-btn">
+                        <svg class="microsoft-icon" viewBox="0 0 21 21" width="20" height="20">
+                            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+                            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+                            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+                            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+                        </svg>
+                        Sign up with Microsoft
+                    </button>
+
+                    <button type="button" class="github-btn" id="github-signup-btn">
+                        <svg class="github-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                            <path
+                                d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+                        </svg>
+                        Sign up with GitHub
+                    </button>
+                </form>
+
+                <div class="login-footer">
+                    <p>Already have an account? <a href="/login">Login</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/signup.js"></script>
+</body>
+
+</html>

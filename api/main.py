@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from api.routes import scans, checks, reports, presets
+from api.routes import scans, checks, reports, presets, auth
 
 
 @asynccontextmanager
@@ -66,11 +66,30 @@ app.include_router(scans.router, prefix="/api")
 app.include_router(checks.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(presets.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 
 # Mount static files for Web UI
 web_dir = Path(__file__).parent.parent / "web"
 if web_dir.exists():
     app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    """Serve login page"""
+    login_path = web_dir / "login.html"
+    if login_path.exists():
+        return HTMLResponse(content=login_path.read_text(encoding='utf-8'))
+    return HTMLResponse(content="<h1>Login page not found</h1>", status_code=404)
+
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page():
+    """Serve signup page"""
+    signup_path = web_dir / "signup.html"
+    if signup_path.exists():
+        return HTMLResponse(content=signup_path.read_text(encoding='utf-8'))
+    return HTMLResponse(content="<h1>Signup page not found</h1>", status_code=404)
 
 
 @app.get("/", response_class=HTMLResponse)
