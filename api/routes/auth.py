@@ -29,6 +29,11 @@ DEFAULT_USERS = {
         "password_hash": hashlib.sha256("analyst123".encode()).hexdigest(),
         "role": "analyst", 
         "name": "Security Analyst"
+    },
+    "pentester": {
+        "password_hash": hashlib.sha256("pentester123".encode()).hexdigest(),
+        "role": "pentester", 
+        "name": "Penetration Tester"
     }
 }
 
