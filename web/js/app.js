@@ -38,12 +38,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function initNavigation() {
     document.querySelectorAll('.nav-item').forEach(item => {
+        // Only handle internal navigation if data-page attribute exists
+        if (!item.dataset.page) {
+            return;
+        }
+
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const page = item.dataset.page;
-            showPage(page);
+            if (page) {
+                showPage(page);
+                // Close sidebar on mobile after navigation
+                if (window.innerWidth <= 768) {
+                    toggleSidebar();
+                }
+            }
         });
     });
+
+    // Initialize sidebar state
+    initSidebarState();
 
     // Handle hash navigation
     if (window.location.hash) {
@@ -52,9 +66,45 @@ function initNavigation() {
     }
 }
 
+// Toggle sidebar for mobile
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    if (sidebar) {
+        sidebar.classList.toggle('open');
+    }
+    if (overlay) {
+        overlay.classList.toggle('active');
+    }
+}
+
+// Toggle sidebar collapse (Desktop)
+function toggleSidebarCollapse() {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+        sidebar.classList.toggle('collapsed');
+        // Save preference
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        localStorage.setItem('sidebarCollapsed', isCollapsed);
+    }
+}
+
+// Initialize sidebar state
+function initSidebarState() {
+    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    const sidebar = document.getElementById('sidebar');
+    if (isCollapsed && sidebar) {
+        sidebar.classList.add('collapsed');
+    }
+}
+
 function showPage(pageName) {
-    // Update nav
-    document.querySelectorAll('.nav-item').forEach(item => {
+    // Don't try to show undefined pages
+    if (!pageName) return;
+
+    // Update nav - only update items that have data-page (not external links)
+    document.querySelectorAll('.nav-item[data-page]').forEach(item => {
         item.classList.toggle('active', item.dataset.page === pageName);
     });
 
@@ -778,7 +828,8 @@ function updateUserProfile(user) {
         const roleMap = {
             'admin': 'Administrator',
             'analyst': 'Analyst',
-            'pentester': 'Pen Tester'
+            'pentester': 'Pen Tester',
+            'user': 'Security User'
         };
         const roleText = roleMap[user.role] || 'Pen Tester';
         roleBadgeEl.textContent = roleText;

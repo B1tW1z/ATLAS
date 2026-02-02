@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="ATLAS API",
-    description="Automated Threat and Lifecycle Assessment System - REST API",
+    description="Advanced Testing Lab for Application Security - REST API",
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
