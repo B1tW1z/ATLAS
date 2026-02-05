@@ -1,33 +1,44 @@
-/* ATLAS Web UI Styles */
+/* ATLAS Web UI Styles - Cyberpunk Theme */
 
 :root {
-    /* Colors */
-    --bg-primary: #0d1117;
-    --bg-secondary: #161b22;
-    --bg-tertiary: #21262d;
-    --bg-card: #1c2128;
+    /* Cyberpunk Colors */
+    --primary: #00ff88;
+    --secondary: #00d4ff;
+    --accent: #ff6b6b;
 
-    --text-primary: #e6edf3;
-    --text-secondary: #8b949e;
-    --text-muted: #6e7681;
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #0f1419;
+    --bg-tertiary: #1a1f2e;
+    --bg-card: #0f1419;
+    --bg-hover: #1a1f2e;
+    --bg-darker: #050810;
 
-    --accent-primary: #58a6ff;
-    --accent-secondary: #388bfd;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
 
-    --severity-critical: #f85149;
-    --severity-high: #f0883e;
-    --severity-medium: #d29922;
-    --severity-low: #3fb950;
-    --severity-info: #58a6ff;
+    --accent-primary: #00ff88;
+    --accent-secondary: #00d4ff;
 
-    --border-color: #30363d;
-    --border-radius: 8px;
+    --severity-critical: #ff4757;
+    --severity-high: #ff6b6b;
+    --severity-medium: #ffd43b;
+    --severity-low: #51cf66;
+    --severity-info: #00d4ff;
+
+    --border-color: #1e293b;
+    --border-radius: 12px;
 
     --sidebar-width: 260px;
 
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #00ff88 0%, #00d4ff 100%);
+    --gradient-glow: 0 0 30px rgba(0, 255, 136, 0.3);
+    --gradient-glow-strong: 0 0 50px rgba(0, 255, 136, 0.5);
+
     /* Transitions */
     --transition-fast: 0.15s ease;
-    --transition-normal: 0.25s ease;
+    --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Reset */
@@ -40,7 +51,7 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.6;

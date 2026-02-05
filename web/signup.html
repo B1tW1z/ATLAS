@@ -6,16 +6,580 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up - ATLAS Security Assessment</title>
     <meta name="description" content="Create an ATLAS account - Advanced Testing Lab for Application Security">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Orbitron:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/static/css/style.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0e1a;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            position: relative;
+        }
+
+        .bg-effects {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(#00ff88 1px, transparent 1px),
+                linear-gradient(90deg, #00ff88 1px, transparent 1px);
+            background-size: 60px 60px;
+            opacity: 0.03;
+            animation: gridMove 30s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(60px, 60px);
+            }
+        }
+
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            box-shadow: 0 0 20px #00ff88;
+            animation: scanDown 4s linear infinite;
+        }
+
+        @keyframes scanDown {
+            0% {
+                top: -3px;
+                opacity: 1;
+            }
+
+            100% {
+                top: 100%;
+                opacity: 0;
+            }
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 480px;
+            animation: slideUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-card {
+            background: linear-gradient(145deg, #0f1419, #050810);
+            border: 1px solid #1e293b;
+            border-radius: 20px;
+            padding: 36px;
+            position: relative;
+            overflow: hidden;
+            animation: cardGlow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes cardGlow {
+            from {
+                box-shadow: 0 0 30px rgba(0, 255, 136, 0.1);
+            }
+
+            to {
+                box-shadow: 0 0 50px rgba(0, 255, 136, 0.2), 0 0 80px rgba(0, 212, 255, 0.1);
+            }
+        }
+
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            animation: borderPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes borderPulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Floating particles */
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: float 8s infinite;
+            opacity: 0;
+        }
+
+        .particle:nth-child(1) {
+            left: 10%;
+            animation-delay: 0s;
+        }
+
+        .particle:nth-child(2) {
+            left: 20%;
+            animation-delay: 1s;
+        }
+
+        .particle:nth-child(3) {
+            left: 30%;
+            animation-delay: 2s;
+        }
+
+        .particle:nth-child(4) {
+            left: 40%;
+            animation-delay: 3s;
+        }
+
+        .particle:nth-child(5) {
+            left: 50%;
+            animation-delay: 4s;
+        }
+
+        .particle:nth-child(6) {
+            left: 60%;
+            animation-delay: 5s;
+        }
+
+        .particle:nth-child(7) {
+            left: 70%;
+            animation-delay: 6s;
+        }
+
+        .particle:nth-child(8) {
+            left: 80%;
+            animation-delay: 7s;
+        }
+
+        .particle:nth-child(9) {
+            left: 90%;
+            animation-delay: 0.5s;
+        }
+
+        .particle:nth-child(10) {
+            left: 15%;
+            animation-delay: 2.5s;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            100% {
+                transform: translateY(-100vh) scale(1);
+                opacity: 0;
+            }
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .login-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 4px;
+            margin-bottom: 8px;
+            position: relative;
+            animation: glitch 5s infinite;
+        }
+
+        @keyframes glitch {
+
+            0%,
+            90%,
+            100% {
+                text-shadow: none;
+            }
+
+            91% {
+                text-shadow: -2px 0 #00ff88, 2px 0 #00d4ff;
+            }
+
+            92% {
+                text-shadow: 2px 0 #00ff88, -2px 0 #00d4ff;
+            }
+
+            93% {
+                text-shadow: none;
+            }
+
+            94% {
+                text-shadow: -1px 0 #ff4757, 1px 0 #00d4ff;
+            }
+
+            95% {
+                text-shadow: none;
+            }
+        }
+
+        .login-subtitle {
+            color: #94a3b8;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            overflow: hidden;
+            animation: typeIn 1s steps(20) 0.5s forwards;
+            width: 0;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        @keyframes typeIn {
+            to {
+                width: 100%;
+            }
+        }
+
+        .login-error,
+        .signup-success {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .login-error {
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+            color: #ff4757;
+        }
+
+        .signup-success {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            color: #00ff88;
+        }
+
+        .login-error:not(:empty),
+        .signup-success:not(:empty) {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #e2e8f0;
+            font-weight: 500;
+            margin-bottom: 6px;
+            font-size: 0.85rem;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 18px;
+            color: #64748b;
+        }
+
+        .login-input,
+        .select-input {
+            width: 100%;
+            padding: 12px 14px 12px 44px;
+            background: rgba(0, 255, 136, 0.03);
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+        }
+
+        .select-input {
+            padding-left: 14px;
+            cursor: pointer;
+        }
+
+        .login-input:focus,
+        .select-input:focus {
+            outline: none;
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+        }
+
+        .input-hint {
+            display: block;
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-top: 6px;
+        }
+
+        .password-strength {
+            height: 4px;
+            background: #1e293b;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .password-match.valid {
+            color: #00ff88;
+        }
+
+        .password-match.invalid {
+            color: #ff4757;
+        }
+
+        /* Terms Container */
+        .terms-container {
+            max-height: 150px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            padding: 16px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            line-height: 1.6;
+        }
+
+        .terms-content h4,
+        .terms-content h5 {
+            color: #00ff88;
+            margin-top: 12px;
+        }
+
+        .terms-content ul {
+            margin-left: 20px;
+        }
+
+        .terms-checkbox-wrapper {
+            margin-top: 12px;
+        }
+
+        .terms-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #94a3b8;
+            cursor: pointer;
+        }
+
+        .terms-checkbox input[type="checkbox"] {
+            accent-color: #00ff88;
+            width: 16px;
+            height: 16px;
+        }
+
+        .terms-checkbox input:disabled+.checkbox-text {
+            opacity: 0.5;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            border: none;
+            border-radius: 10px;
+            color: #0a0e1a;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 8px;
+        }
+
+        .login-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: #64748b;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: #1e293b;
+        }
+
+        .divider span {
+            padding: 0 16px;
+            font-size: 0.85rem;
+        }
+
+        .google-btn,
+        .microsoft-btn,
+        .github-btn {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 255, 136, 0.05);
+            border: 1px solid #1e293b;
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+
+        .google-btn:hover,
+        .microsoft-btn:hover,
+        .github-btn:hover {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #1e293b;
+            color: #94a3b8;
+        }
+
+        .login-footer a {
+            color: #00ff88;
+            text-decoration: none;
+        }
+
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 24px;
+            }
+
+            .login-title {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
 </head>
 
 <body>
+    <div class="bg-effects">
+        <div class="grid-overlay"></div>
+        <div class="scan-line"></div>
+    </div>
+
+    <!-- Floating Particles -->
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
     <div class="login-page">
         <div class="login-container signup-container">
             <div class="login-card">
                 <div class="login-header">
                     <h1 class="login-title">ATLAS</h1>
-                    <p class="login-subtitle">Create Your Account</p>
+                    <p class="login-subtitle">// Create Your Account</p>
                 </div>
 
                 <div id="signup-error" class="login-error"></div>
@@ -75,7 +639,7 @@
                                 placeholder="Create a password" autocomplete="new-password" minlength="8" required>
                             <button type="button" id="password-toggle" class="password-toggle"
                                 aria-label="Toggle password visibility">
-                                <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                     stroke="currentColor" width="18" height="18">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -118,53 +682,22 @@
                                 <h4>ATLAS Security Assessment Framework</h4>
                                 <h5>Terms and Conditions of Use</h5>
                                 <p><strong>Last Updated:</strong> February 2026</p>
-
                                 <h5>1. Acceptance of Terms</h5>
                                 <p>By accessing and using ATLAS ("the Platform"), you agree to be bound by these Terms
-                                    and Conditions. If you do not agree with any part of these terms, you must not use
-                                    the Platform.</p>
-
+                                    and Conditions.</p>
                                 <h5>2. Educational Purpose</h5>
                                 <p>ATLAS is designed exclusively for educational purposes and authorized security
-                                    testing. You agree to use this tool only on systems you own or have explicit written
-                                    permission to test.</p>
-
+                                    testing.</p>
                                 <h5>3. Prohibited Activities</h5>
                                 <p>You agree NOT to:</p>
                                 <ul>
                                     <li>Use ATLAS to attack systems without proper authorization</li>
                                     <li>Attempt to gain unauthorized access to any network or system</li>
                                     <li>Use the Platform for any illegal or malicious activities</li>
-                                    <li>Share your account credentials with unauthorized users</li>
-                                    <li>Reverse engineer or attempt to extract source code</li>
                                 </ul>
-
-                                <h5>4. User Responsibilities</h5>
-                                <p>As a user you are responsible for:</p>
-                                <ul>
-                                    <li>Obtaining proper written authorization before testing any system</li>
-                                    <li>Maintaining the confidentiality of your account</li>
-                                    <li>Reporting any vulnerabilities discovered responsibly</li>
-                                    <li>Complying with all applicable laws and regulations</li>
-                                </ul>
-
-                                <h5>5. Limitation of Liability</h5>
-                                <p>ATLAS is provided "as is" without warranties of any kind. The developers shall not be
-                                    liable for any damages arising from the use or inability to use the Platform.</p>
-
-                                <h5>6. Legal Compliance</h5>
-                                <p>You agree to comply with all applicable local, state, national, and international
-                                    laws regarding computer security and ethical hacking practices.</p>
-
-                                <h5>7. Account Termination</h5>
-                                <p>We reserve the right to terminate accounts that violate these terms without prior
-                                    notice.</p>
-
-                                <h5>8. Changes to Terms</h5>
-                                <p>We may modify these terms at any time. Continued use after changes constitutes
-                                    acceptance of modified terms.</p>
-
-                                <p class="terms-end-marker"><strong>— End of Terms and Conditions —</strong></p>
+                                <h5>4. Limitation of Liability</h5>
+                                <p>ATLAS is provided "as is" without warranties of any kind.</p>
+                                <p class="terms-end-marker"><strong>— End of Terms —</strong></p>
                             </div>
                         </div>
                         <div class="terms-checkbox-wrapper">
@@ -172,21 +705,19 @@
                                 <input type="checkbox" id="terms-accept" name="terms-accept" disabled required>
                                 <span class="checkbox-text">I have read and agree to the Terms and Conditions</span>
                             </label>
-                            <small class="input-hint" id="terms-hint">Please scroll to the end of the Terms and
-                                Conditions to enable this checkbox</small>
+                            <small class="input-hint" id="terms-hint">Please scroll to the end of the Terms to
+                                enable</small>
                         </div>
                     </div>
 
                     <button type="submit" class="login-btn" id="signup-btn" disabled>
-                        Create Account
+                        <i class="fas fa-user-plus"></i> Create Account
                     </button>
 
-                    <div class="divider">
-                        <span>or</span>
-                    </div>
+                    <div class="divider"><span>or</span></div>
 
                     <button type="button" class="google-btn" id="google-signup-btn">
-                        <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <svg viewBox="0 0 24 24" width="20" height="20">
                             <path fill="#4285F4"
                                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                             <path fill="#34A853"
@@ -200,7 +731,7 @@
                     </button>
 
                     <button type="button" class="microsoft-btn" id="microsoft-signup-btn">
-                        <svg class="microsoft-icon" viewBox="0 0 21 21" width="20" height="20">
+                        <svg viewBox="0 0 21 21" width="20" height="20">
                             <rect x="1" y="1" width="9" height="9" fill="#f25022" />
                             <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
                             <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
@@ -210,7 +741,7 @@
                     </button>
 
                     <button type="button" class="github-btn" id="github-signup-btn">
-                        <svg class="github-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                             <path
                                 d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
                         </svg>

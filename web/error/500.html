@@ -5,26 +5,97 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>500 - Server Error | ATLAS</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Orbitron:wght@600;700;800&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #0f1419;
+            --primary: #00ff88;
+            --secondary: #00d4ff;
+            --accent: #ff4757;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --border-color: #1e293b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .bg-effects {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(var(--accent) 1px, transparent 1px),
+                linear-gradient(90deg, var(--accent) 1px, transparent 1px);
+            background-size: 60px 60px;
+            opacity: 0.02;
+        }
+
         .error-page {
             min-height: 100vh;
-            background: var(--bg-primary);
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
+            position: relative;
+            z-index: 1;
         }
 
         .error-container {
             text-align: center;
             max-width: 500px;
+            background: linear-gradient(145deg, var(--bg-secondary), #050810);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 50px 40px;
+            position: relative;
+        }
+
+        .error-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), #ff6b6b);
+            border-radius: 20px 20px 0 0;
+        }
+
+        .error-icon {
+            font-size: 4rem;
+            margin-bottom: 24px;
+            filter: drop-shadow(0 0 20px rgba(255, 71, 87, 0.5));
         }
 
         .error-code {
-            font-size: 8rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--severity-critical), var(--severity-high));
+            font-family: 'Orbitron', monospace;
+            font-size: 6rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), #ff6b6b);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -33,20 +104,19 @@
         }
 
         .error-title {
-            font-size: 1.8rem;
+            font-family: 'Orbitron', monospace;
+            font-size: 1.4rem;
             color: var(--text-primary);
             margin-bottom: 16px;
+            letter-spacing: 2px;
         }
 
         .error-description {
+            font-family: 'Fira Code', monospace;
             color: var(--text-secondary);
             margin-bottom: 32px;
-            line-height: 1.6;
-        }
-
-        .error-icon {
-            font-size: 4rem;
-            margin-bottom: 24px;
+            line-height: 1.8;
+            font-size: 0.9rem;
         }
 
         .error-actions {
@@ -61,20 +131,20 @@
             align-items: center;
             gap: 8px;
             padding: 14px 28px;
-            background: var(--severity-high);
-            color: white;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: var(--bg-primary);
             text-decoration: none;
-            border-radius: var(--border-radius);
-            font-weight: 500;
-            transition: all var(--transition-fast);
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
             border: none;
             cursor: pointer;
             font-size: 1rem;
         }
 
         .btn-retry:hover {
-            background: var(--severity-critical);
-            transform: translateY(-2px);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.4);
         }
 
         .btn-home {
@@ -82,52 +152,36 @@
             align-items: center;
             gap: 8px;
             padding: 14px 28px;
-            background: var(--bg-secondary);
+            background: rgba(0, 255, 136, 0.05);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
             text-decoration: none;
-            border-radius: var(--border-radius);
+            border-radius: 12px;
             font-weight: 500;
-            transition: all var(--transition-fast);
+            transition: all 0.3s;
         }
 
         .btn-home:hover {
-            background: var(--bg-tertiary);
-        }
-
-        .error-details {
-            margin-top: 32px;
-            padding: 16px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--border-radius);
-            text-align: left;
-        }
-
-        .error-details summary {
-            cursor: pointer;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-
-        .error-details pre {
-            margin-top: 12px;
-            color: var(--text-muted);
-            font-size: 0.85rem;
-            overflow-x: auto;
+            border-color: var(--primary);
+            background: rgba(0, 255, 136, 0.1);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
         }
     </style>
 </head>
 
 <body>
+    <div class="bg-effects">
+        <div class="grid-overlay"></div>
+    </div>
+
     <div class="error-page">
         <div class="error-container">
             <div class="error-icon">⚠️</div>
             <div class="error-code">500</div>
-            <h1 class="error-title">Internal Server Error</h1>
+            <h1 class="error-title">SYSTEM ERROR</h1>
             <p class="error-description">
-                Something went wrong on our end. Our security bots are investigating the issue.
-                Please try again in a moment.
+                // Critical system failure detected.
+                Security bots are investigating. Please retry in a moment.
             </p>
             <div class="error-actions">
                 <button onclick="location.reload()" class="btn-retry">
@@ -135,7 +189,7 @@
                         <polyline points="23 4 23 10 17 10" />
                         <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                     </svg>
-                    Try Again
+                    Retry
                 </button>
                 <a href="/" class="btn-home">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

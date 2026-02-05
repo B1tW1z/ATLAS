@@ -6,12 +6,239 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ATLAS - Security Assessment Framework</title>
     <meta name="description" content="Advanced Testing Lab for Application Security - Guided Vulnerability Assessment">
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Orbitron:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="/static/css/style.css?v=3">
     <link rel="icon" type="image/svg+xml" href="/static/assets/favicon.svg">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Cyberpunk Background Effect */
+        .bg-effects {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(#00ff88 1px, transparent 1px),
+                linear-gradient(90deg, #00ff88 1px, transparent 1px);
+            background-size: 60px 60px;
+            opacity: 0.02;
+            animation: gridMove 30s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            100% {
+                transform: translate(60px, 60px);
+            }
+        }
+
+        /* Cyberpunk Logo */
+        .logo {
+            font-family: 'Orbitron', monospace !important;
+            font-size: 1.4rem !important;
+            font-weight: 800 !important;
+            background: linear-gradient(135deg, #00ff88, #00d4ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 3px;
+        }
+
+        .tagline {
+            font-family: 'Fira Code', monospace !important;
+            color: #64748b !important;
+            font-size: 0.7rem !important;
+        }
+
+        /* Enhanced Nav Items */
+        .nav-item.active {
+            background: rgba(0, 255, 136, 0.1) !important;
+            border-left: 3px solid #00ff88 !important;
+            color: #00ff88 !important;
+        }
+
+        .nav-item:hover {
+            background: rgba(0, 255, 136, 0.05) !important;
+            color: #00ff88 !important;
+        }
+
+        /* Glowing Stat Cards */
+        .stat-card {
+            background: linear-gradient(145deg, #0f1419, #050810) !important;
+            border: 1px solid #1e293b !important;
+            transition: all 0.3s !important;
+        }
+
+        .stat-card:hover {
+            border-color: #00ff88 !important;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.2) !important;
+            transform: translateY(-5px);
+        }
+
+        .stat-value {
+            font-family: 'Orbitron', monospace !important;
+            font-weight: 700 !important;
+        }
+
+        /* Enhanced Buttons */
+        .btn-primary {
+            background: linear-gradient(135deg, #00ff88, #00d4ff) !important;
+            color: #0a0e1a !important;
+            border: none !important;
+            font-weight: 600 !important;
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4) !important;
+            transform: translateY(-2px);
+        }
+
+        /* Terminal-style Cards */
+        .card {
+            background: linear-gradient(145deg, #0f1419, #050810) !important;
+            border: 1px solid #1e293b !important;
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #00ff88, #00d4ff);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card h3 {
+            font-family: 'Orbitron', monospace;
+            color: #00ff88 !important;
+        }
+
+        /* Form Inputs */
+        .form-input {
+            background: rgba(0, 255, 136, 0.03) !important;
+            border: 1px solid #1e293b !important;
+            color: #e2e8f0 !important;
+        }
+
+        .form-input:focus {
+            border-color: #00ff88 !important;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.2) !important;
+        }
+
+        /* Progress Bars */
+        .progress-fill {
+            background: linear-gradient(90deg, #00ff88, #00d4ff) !important;
+            box-shadow: 0 0 10px #00ff88 !important;
+        }
+
+        /* Data Tables */
+        .data-table th {
+            background: rgba(0, 255, 136, 0.05) !important;
+            color: #00ff88 !important;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Severity Colors */
+        .stat-critical .stat-value,
+        .summary-stat.critical .summary-value {
+            color: #ff4757 !important;
+        }
+
+        .stat-high .stat-value,
+        .summary-stat.high .summary-value {
+            color: #ff6b6b !important;
+        }
+
+        .stat-medium .stat-value,
+        .summary-stat.medium .summary-value {
+            color: #ffd43b !important;
+        }
+
+        /* User Profile */
+        .user-avatar {
+            background: linear-gradient(135deg, #00ff88, #00d4ff) !important;
+            color: #0a0e1a !important;
+        }
+
+        .user-role-badge {
+            background: rgba(0, 255, 136, 0.1) !important;
+            color: #00ff88 !important;
+        }
+
+        /* Page Headers */
+        .page-header h2 {
+            font-family: 'Orbitron', monospace;
+            letter-spacing: 2px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: linear-gradient(180deg, #0f1419, #050810) !important;
+            border-right: 1px solid #1e293b !important;
+        }
+
+        .logo-icon svg {
+            stroke: #00ff88 !important;
+        }
+
+        /* API Status */
+        .status-dot {
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            background: rgba(10, 14, 26, 0.9) !important;
+        }
+
+        .spinner {
+            border-top-color: #00ff88 !important;
+        }
+    </style>
+
     <script src="/static/js/app.js?v=2" defer></script>
 </head>
 
 <body>
+    <!-- Cyberpunk Background Effects -->
+    <div class="bg-effects">
+        <div class="grid-overlay"></div>
+    </div>
+
     <div id="app">
         <!-- Mobile Hamburger Toggle -->
         <button class="hamburger-btn" id="hamburger-btn" onclick="toggleSidebar()">
