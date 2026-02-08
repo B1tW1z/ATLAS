@@ -937,3 +937,44 @@ function loadProfile() {
         btn.onclick = () => alert('This feature is coming soon!');
     });
 }
+
+// ========== Theme Toggle ==========
+
+/**
+ * Initialize theme from localStorage preference
+ */
+function initTheme() {
+    const savedTheme = localStorage.getItem('atlas_theme');
+    if (savedTheme === 'cyberpunk') {
+        document.body.classList.add('cyberpunk-theme');
+        updateThemeToggleText(true);
+    }
+}
+
+/**
+ * Toggle between original and cyberpunk themes
+ */
+function toggleTheme() {
+    const isCyberpunk = document.body.classList.toggle('cyberpunk-theme');
+    
+    // Save preference to localStorage
+    localStorage.setItem('atlas_theme', isCyberpunk ? 'cyberpunk' : 'default');
+    
+    // Update button text
+    updateThemeToggleText(isCyberpunk);
+}
+
+/**
+ * Update the toggle button text based on current theme
+ */
+function updateThemeToggleText(isCyberpunk) {
+    const toggleText = document.getElementById('theme-toggle-text');
+    if (toggleText) {
+        toggleText.textContent = isCyberpunk ? 'Classic Mode' : 'Cyberpunk Mode';
+    }
+}
+
+// Initialize theme on page load
+document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+});
