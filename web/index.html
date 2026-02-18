@@ -671,6 +671,120 @@
                 </div>
             </section>
 
+            <!-- IoTGoat Demo Simulation Page -->
+            <section id="page-iotgoat-demo" class="page">
+                <header class="page-header">
+                    <h2>OWASP IoTGoat — Live Simulation</h2>
+                    <button class="btn btn-secondary" onclick="showPage('demo')">← Back to Demos</button>
+                </header>
+
+                <!-- Simulation Info Bar -->
+                <div class="sim-info-bar">
+                    <div class="sim-info-left">
+                        <span class="sim-device-icon">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                        </span>
+                        <span class="sim-device-name">IoTGoat OpenWrt Router</span>
+                        <span class="sim-ip-badge">172.16.100.213</span>
+                    </div>
+                    <div class="sim-info-right">
+                        <span class="sim-progress-text"><span id="sim-steps-done">0</span> / <span id="sim-steps-total">9</span> Challenges</span>
+                        <div class="sim-progress-bar">
+                            <div class="sim-progress-fill" id="sim-progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sim-layout">
+                    <!-- Step Navigator -->
+                    <div class="sim-navigator">
+                        <div class="sim-nav-title">Challenge Steps</div>
+                        <div id="sim-step-list" class="sim-step-list"></div>
+                        <button class="btn btn-primary sim-complete-btn" id="sim-complete-btn" style="display:none;" onclick="showSimulationSummary()">
+                            View Summary Report
+                        </button>
+                    </div>
+
+                    <!-- Main Simulation Panel -->
+                    <div class="sim-main-panel">
+                        <!-- Step Header -->
+                        <div class="sim-step-header" id="sim-step-header">
+                            <div class="sim-step-number" id="sim-step-number">01</div>
+                            <div>
+                                <h3 id="sim-step-title">Select a challenge to begin</h3>
+                                <span class="sim-owasp-badge" id="sim-owasp-badge"></span>
+                            </div>
+                        </div>
+
+                        <p class="sim-step-desc" id="sim-step-desc">Click on a challenge step in the left panel to start the simulation.</p>
+
+                        <!-- Terminal -->
+                        <div class="sim-terminal" id="sim-terminal">
+                            <div class="sim-terminal-header">
+                                <span class="sim-terminal-dot red"></span>
+                                <span class="sim-terminal-dot yellow"></span>
+                                <span class="sim-terminal-dot green"></span>
+                                <span class="sim-terminal-title">root@kali:~#</span>
+                            </div>
+                            <div class="sim-terminal-body" id="sim-terminal-body">
+                                <div class="sim-terminal-line dim">Welcome to ATLAS IoTGoat Simulation</div>
+                                <div class="sim-terminal-line dim">Type 'help' or select a challenge to begin...</div>
+                                <div class="sim-terminal-cursor">█</div>
+                            </div>
+                        </div>
+
+                        <!-- Findings revealed after terminal animation -->
+                        <div id="sim-findings-panel" class="sim-findings-panel" style="display:none;">
+                            <h4 class="sim-findings-title">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                                Vulnerabilities Discovered
+                            </h4>
+                            <div id="sim-findings-list"></div>
+                        </div>
+
+                        <!-- Navigation Buttons -->
+                        <div class="sim-step-nav" id="sim-step-nav" style="display:none;">
+                            <button class="btn btn-secondary" id="sim-prev-btn" onclick="navigateSimStep(-1)">← Previous</button>
+                            <button class="btn btn-primary" id="sim-next-btn" onclick="navigateSimStep(1)">Next Challenge →</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Overlay (shown when all steps done) -->
+                <div id="sim-summary-overlay" class="sim-summary-overlay" style="display:none;">
+                    <div class="sim-summary-card">
+                        <h3>IoTGoat Simulation Complete</h3>
+                        <p class="sim-summary-subtitle">All 9 OWASP IoT Top 10 challenge categories explored</p>
+
+                        <div class="sim-severity-grid">
+                            <div class="sim-severity-item critical">
+                                <span class="sim-severity-count" id="sim-sum-critical">0</span>
+                                <span class="sim-severity-label">Critical</span>
+                            </div>
+                            <div class="sim-severity-item high">
+                                <span class="sim-severity-count" id="sim-sum-high">0</span>
+                                <span class="sim-severity-label">High</span>
+                            </div>
+                            <div class="sim-severity-item medium">
+                                <span class="sim-severity-count" id="sim-sum-medium">0</span>
+                                <span class="sim-severity-label">Medium</span>
+                            </div>
+                        </div>
+
+                        <div id="sim-summary-findings" class="sim-summary-findings"></div>
+
+                        <div class="sim-summary-actions">
+                            <button class="btn btn-secondary" onclick="closeSimulationSummary()">Back to Simulation</button>
+                            <button class="btn btn-primary" onclick="showPage('demo')">Done</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Reports Page -->
             <section id="page-reports" class="page">
                 <header class="page-header">
