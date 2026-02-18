@@ -705,9 +705,10 @@ async function loadDemoTargets() {
 }
 
 async function startPresetScan(presetId, defaultUrl) {
-    // IoTGoat: launch interactive simulation instead of scan wizard
-    if (presetId === 'iotgoat') {
-        await launchIoTGoatDemo();
+    // Presets with interactive simulations
+    const simulatablePresets = ['iotgoat', 'vulnbank'];
+    if (simulatablePresets.includes(presetId)) {
+        await launchPresetSimulation(presetId);
         return;
     }
 
@@ -730,16 +731,42 @@ let simCurrentStep = -1;
 let simCompletedSteps = new Set();
 let simIsAnimating = false;
 
-async function launchIoTGoatDemo() {
-    showLoading('Initializing IoTGoat simulation...');
+const PRESET_SIM_META = {
+    iotgoat: {
+        label: 'OWASP IoTGoat',
+        ip: '192.168.1.1',
+        termTitle: 'iotgoatuser@IoTGoat:~',
+        icon: '📡'
+    },
+    vulnbank: {
+        label: 'VulnBank',
+        ip: '127.0.0.1:5000',
+        termTitle: 'pentester@kali:~/vulnbank',
+        icon: '🏦'
+    }
+};
+
+async function launchPresetSimulation(presetId) {
+    const meta = PRESET_SIM_META[presetId] || { label: presetId, ip: 'localhost', termTitle: 'user@host:~', icon: '🔍' };
+    showLoading(`Initializing ${meta.label} simulation...`);
     try {
-        simData = await apiRequest('/presets/iotgoat/simulate', { method: 'POST' });
+        simData = await apiRequest(`/presets/${presetId}/simulate`, { method: 'POST' });
         simCurrentStep = -1;
         simCompletedSteps = new Set();
         simIsAnimating = false;
 
         showPage('iotgoat-demo');
         hideLoading();
+
+        // Update page header dynamically
+        const titleEl = document.querySelector('#page-iotgoat-demo .page-header h2');
+        if (titleEl) titleEl.textContent = `${meta.label} — Live Simulation`;
+        const deviceName = document.querySelector('.sim-device-name');
+        if (deviceName) deviceName.textContent = meta.label;
+        const ipBadge = document.querySelector('.sim-ip-badge');
+        if (ipBadge) ipBadge.textContent = meta.ip;
+        const termTitle = document.querySelector('.sim-terminal-title');
+        if (termTitle) termTitle.textContent = meta.termTitle;
 
         renderSimStepList();
         updateSimProgress();
@@ -748,7 +775,7 @@ async function launchIoTGoatDemo() {
         runSimulationStep(0);
     } catch (error) {
         hideLoading();
-        alert('Failed to load IoTGoat simulation: ' + error.message);
+        alert(`Failed to load ${meta.label} simulation: ` + error.message);
     }
 }
 
