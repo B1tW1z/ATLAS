@@ -252,7 +252,7 @@ const SignupManager = {
                 }
                 // Redirect to dashboard after short delay
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.href = '/dashboard';
                 }, 1500);
             } else {
                 this.showError(errorDiv, data.detail || 'Signup failed. Please try again.');
@@ -305,7 +305,7 @@ const SignupManager = {
                 this.hideLoadingModal();
                 this.showSuccess(successDiv, 'Google sign-in successful! Redirecting...');
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.href = '/dashboard';
                 }, 1000);
             } else {
                 this.hideLoadingModal();
@@ -388,7 +388,7 @@ const SignupManager = {
                 }
                 this.showSuccess(successDiv, 'Microsoft sign-in successful! Redirecting...');
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.href = '/dashboard';
                 }, 1000);
             } else {
                 this.showError(errorDiv, data.detail || 'Microsoft sign-up failed');
@@ -425,7 +425,7 @@ const SignupManager = {
                 }
                 this.showSuccess(successDiv, 'GitHub sign-in successful! Redirecting...');
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.href = '/dashboard';
                 }, 1000);
             } else {
                 this.showError(errorDiv, data.detail || 'GitHub sign-up failed');

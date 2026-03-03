@@ -71,3 +71,17 @@ npm-debug.log
 .cache/
 elite-cybersecurity-portfoliointeractive-security
 elite-cybersecurity-portfoliointeractive-security.zip
+
+.agent/
+.gemini/
+.gsd/
+GSD-STYLE.md
+PROJECT_RULES.md
+adapters/
+docs/
+model_capabilities.yaml
+scripts/
+GSD-STYLE.md
+model_capabilities.yaml
+PROJECT_RULES.md
+Project_Report.md

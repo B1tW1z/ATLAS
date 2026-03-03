@@ -7,10 +7,11 @@
 const API_BASE = '/api';
 
 // State
-let currentScanId = null;
+let currentScanId = sessionStorage.getItem('atlas_scan_id') || null;
 let selectedChecks = new Set();
 let allChecks = [];
 let currentUser = null;
+let allScans = [];
 
 // ========== Initialization ==========
 
@@ -25,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initNavigation();
     checkApiStatus();
+    startHeaderClock();
     loadDashboard();
 
     // Close user menu when clicking outside
@@ -56,9 +58,6 @@ function initNavigation() {
         });
     });
 
-    // Initialize sidebar state
-    initSidebarState();
-
     // Handle hash navigation
     if (window.location.hash) {
         const page = window.location.hash.replace('#', '');
@@ -79,24 +78,17 @@ function toggleSidebar() {
     }
 }
 
-// Toggle sidebar collapse (Desktop)
-function toggleSidebarCollapse() {
-    const sidebar = document.getElementById('sidebar');
-    if (sidebar) {
-        sidebar.classList.toggle('collapsed');
-        // Save preference
-        const isCollapsed = sidebar.classList.contains('collapsed');
-        localStorage.setItem('sidebarCollapsed', isCollapsed);
+// Live header clock
+function startHeaderClock() {
+    function tick() {
+        const el = document.getElementById('header-clock');
+        if (el) {
+            const now = new Date();
+            el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
     }
-}
-
-// Initialize sidebar state
-function initSidebarState() {
-    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    const sidebar = document.getElementById('sidebar');
-    if (isCollapsed && sidebar) {
-        sidebar.classList.add('collapsed');
-    }
+    tick();
+    setInterval(tick, 30000); // update every 30s
 }
 
 function showPage(pageName) {
@@ -131,7 +123,21 @@ function showPage(pageName) {
         loadReports();
     } else if (pageName === 'profile') {
         loadProfile();
+    } else if (pageName === 'activity') {
+        loadActivityFeed();
+    } else if (pageName === 'scheduling') {
+        loadSchedules();
+    } else if (pageName === 'terminal') {
+        initWebTerminal();
     }
+    // Update header breadcrumb
+    const pageLabels = {
+        dashboard: 'Dashboard', 'new-scan': 'New Scan', checks: 'Vulnerability Checks',
+        demo: 'Demo Targets', reports: 'Reports', activity: 'Activity Log',
+        scheduling: 'Scheduled Scans', terminal: 'Terminal', profile: 'Profile', settings: 'Settings'
+    };
+    const bc = document.getElementById('header-breadcrumb');
+    if (bc) bc.textContent = pageLabels[pageName] || pageName;
 
     window.location.hash = pageName;
 }
@@ -170,40 +176,192 @@ async function checkApiStatus() {
     }
 }
 
+// ========== Toast Notification System ==========
+
+function showToast(message, type = 'info', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    if (!container) { console.warn(message); return; }
+
+    const icons = { success: '\u2713', error: '\u2715', info: '\u2139', warning: '\u26a0' };
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <span class="toast-message">${message}</span>
+        <button class="toast-close" onclick="this.closest('.toast').remove()">\u00d7</button>
+    `;
+    container.appendChild(toast);
+
+    const timer = setTimeout(() => {
+        toast.classList.add('dismissing');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+
+    toast.querySelector('.toast-close').addEventListener('click', () => clearTimeout(timer));
+}
+
+// ========== Animated Counter ==========
+
+function animateCounter(element, target, duration = 600) {
+    if (!element || target === 0) { if (element) element.textContent = target; return; }
+    const start = 0;
+    const startTime = performance.now();
+    function update(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        element.textContent = Math.round(start + (target - start) * ease);
+        if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+}
+
+// ========== Donut Chart ==========
+
+function renderDonutChart(severity) {
+    const chart = document.getElementById('donut-chart');
+    const legend = document.getElementById('chart-legend');
+    const totalEl = document.getElementById('donut-total');
+    if (!chart || !legend) return;
+
+    const c = severity.critical || 0;
+    const h = severity.high || 0;
+    const m = severity.medium || 0;
+    const l = severity.low || 0;
+    const total = c + h + m + l;
+
+    if (total === 0) {
+        chart.style.background = 'var(--bg-tertiary)';
+        totalEl.textContent = '0';
+        legend.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem;">No findings yet</span>';
+        return;
+    }
+
+    animateCounter(totalEl, total);
+
+    const slices = [];
+    let angle = 0;
+    const addSlice = (val, color) => {
+        if (val === 0) return;
+        const deg = (val / total) * 360;
+        slices.push(`${color} ${angle}deg ${angle + deg}deg`);
+        angle += deg;
+    };
+    addSlice(c, '#ff4757');
+    addSlice(h, '#ff6b6b');
+    addSlice(m, '#ffd43b');
+    addSlice(l, '#51cf66');
+
+    chart.style.background = `conic-gradient(${slices.join(', ')})`;
+
+    legend.innerHTML = [
+        { label: 'Critical', cls: 'critical', val: c },
+        { label: 'High', cls: 'high', val: h },
+        { label: 'Medium', cls: 'medium', val: m },
+        { label: 'Low', cls: 'low', val: l }
+    ].map(i => `
+        <div class="legend-item">
+            <span class="legend-dot ${i.cls}"></span>
+            <span>${i.label}</span>
+            <span class="legend-count">${i.val}</span>
+        </div>
+    `).join('');
+}
+
+// ========== Scan Filter ==========
+
+function filterScans() {
+    const query = (document.getElementById('scan-search')?.value || '').toLowerCase().trim();
+    const tbody = document.getElementById('scans-table-body');
+    if (!tbody || !allScans.length) return;
+
+    const filtered = query
+        ? allScans.filter(s =>
+            s.id.toLowerCase().includes(query) ||
+            s.target.toLowerCase().includes(query) ||
+            s.status.toLowerCase().includes(query) ||
+            s.phase.toLowerCase().includes(query)
+        )
+        : allScans;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No scans match your search.</td></tr>';
+        return;
+    }
+    renderScanRows(tbody, filtered);
+}
+
+function renderScanRows(tbody, scans) {
+    tbody.innerHTML = scans.map(scan => `
+        <tr>
+            <td><code>${scan.id}</code></td>
+            <td>${truncate(scan.target, 40)}</td>
+            <td><span class="status-${scan.status}">${scan.status}</span></td>
+            <td>${scan.phase}</td>
+            <td>${formatDate(scan.created_at)}</td>
+            <td>
+                <button class="btn btn-sm" onclick="viewScan('${scan.id}')">View</button>
+                ${scan.status === 'paused' ?
+            `<button class="btn btn-sm btn-secondary" onclick="resumeScan('${scan.id}')">Resume</button>` : ''
+        }
+                <button class="btn btn-sm btn-secondary" title="Export" onclick="exportScan('${scan.id}')" style="padding: 4px 8px;">\u2b07</button>
+                <button class="btn btn-sm" title="Delete" onclick="deleteScan('${scan.id}')" style="padding: 4px 8px; color: var(--severity-critical); border-color: var(--severity-critical);">\u2715</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
 // ========== Dashboard ==========
 
 async function loadDashboard() {
+    const tbody = document.getElementById('scans-table-body');
+
+    // Show skeleton loading
+    tbody.innerHTML = Array(4).fill('').map(() => `
+        <tr>
+            <td><div class="skeleton skeleton-cell" style="width:60px"></div></td>
+            <td><div class="skeleton skeleton-cell" style="width:80%"></div></td>
+            <td><div class="skeleton skeleton-cell" style="width:50px"></div></td>
+            <td><div class="skeleton skeleton-cell" style="width:60px"></div></td>
+            <td><div class="skeleton skeleton-cell" style="width:70px"></div></td>
+            <td><div class="skeleton skeleton-cell" style="width:100px"></div></td>
+        </tr>
+    `).join('');
+
     try {
+        // Fetch real stats from dashboard API
+        try {
+            const stats = await apiRequest('/dashboard/stats');
+            const sev = stats.findings_by_severity || stats.severity_breakdown || {};
+            animateCounter(document.getElementById('stat-total-scans'), stats.total_scans || 0);
+            animateCounter(document.getElementById('stat-critical'), sev.critical || 0);
+            animateCounter(document.getElementById('stat-high'), sev.high || 0);
+            animateCounter(document.getElementById('stat-medium'), sev.medium || 0);
+            renderDonutChart(sev);
+        } catch (e) {
+            console.warn('Dashboard stats unavailable:', e);
+        }
+
         const { scans } = await apiRequest('/scans?limit=10');
-
-        document.getElementById('stat-total-scans').textContent = scans.length;
-
-        const tbody = document.getElementById('scans-table-body');
+        allScans = scans;
 
         if (scans.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty-state">No scans yet. Start your first scan!</td>
+                    <td colspan="6">
+                        <div class="empty-state-enhanced">
+                            <div class="empty-state-icon">🔍</div>
+                            <h4>No scans yet</h4>
+                            <p>Launch your first vulnerability assessment to see results here.</p>
+                            <button class="btn btn-primary btn-sm" onclick="showPage('new-scan')">+ Start First Scan</button>
+                        </div>
+                    </td>
                 </tr>
             `;
             return;
         }
 
-        tbody.innerHTML = scans.map(scan => `
-            <tr>
-                <td><code>${scan.id}</code></td>
-                <td>${truncate(scan.target, 40)}</td>
-                <td><span class="status-${scan.status}">${scan.status}</span></td>
-                <td>${scan.phase}</td>
-                <td>${formatDate(scan.created_at)}</td>
-                <td>
-                    <button class="btn btn-sm" onclick="viewScan('${scan.id}')">View</button>
-                    ${scan.status === 'paused' ?
-                `<button class="btn btn-sm btn-secondary" onclick="resumeScan('${scan.id}')">Resume</button>` : ''
-            }
-                </td>
-            </tr>
-        `).join('');
+        renderScanRows(tbody, scans);
 
     } catch (error) {
         console.error('Failed to load dashboard:', error);
@@ -214,6 +372,7 @@ async function loadDashboard() {
 
 function resetScanWizard() {
     currentScanId = null;
+    sessionStorage.removeItem('atlas_scan_id');
     selectedChecks.clear();
     document.getElementById('target-input').value = '';
     goToStep(1);
@@ -244,7 +403,7 @@ async function startScan() {
     const wordlist = document.getElementById('wordlist-input').value.trim();
 
     if (!target) {
-        alert('Please enter a target URL or IP address');
+        showToast('Please enter a target URL or IP address', 'warning');
         return;
     }
 
@@ -264,6 +423,7 @@ async function startScan() {
         });
 
         currentScanId = scan.id;
+        sessionStorage.setItem('atlas_scan_id', scan.id);
 
         // Move to recon step
         goToStep(2);
@@ -274,7 +434,7 @@ async function startScan() {
 
     } catch (error) {
         hideLoading();
-        alert('Failed to start scan: ' + error.message);
+        showToast('Failed to start scan: ' + error.message, 'error');
     }
 }
 
@@ -285,28 +445,130 @@ async function runReconnaissance() {
     // Animate progress
     let progress = 0;
     const progressInterval = setInterval(() => {
-        progress = Math.min(progress + 5, 90);
+        progress = Math.min(progress + 2, 90);
         progressFill.style.width = `${progress}%`;
-    }, 200);
+    }, 500);
 
     try {
         statusText.textContent = 'Scanning ports and services...';
 
-        const results = await apiRequest(`/scans/${currentScanId}/recon`, {
-            method: 'POST'
-        });
+        // Fire-and-forget: kick off recon in background
+        fetch(`${API_BASE}/scans/${currentScanId}/recon`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).catch(() => { });
+
+        // Poll scan status until recon completes (120s timeout)
+        const results = await pollScanPhase('SELECTION', statusText, [
+            'Scanning ports and services...',
+            'Enumerating service versions...',
+            'Fingerprinting target...',
+            'Analyzing discovered services...'
+        ], 90); // 90 attempts × 2s = 180s timeout
 
         clearInterval(progressInterval);
         progressFill.style.width = '100%';
         statusText.textContent = 'Reconnaissance complete!';
 
         // Display results
-        displayReconResults(results);
+        if (results && results.recon) {
+            displayReconResults(results.recon);
+        } else {
+            try {
+                const scanData = await apiRequest(`/scans/${currentScanId}`);
+                displayReconResults({
+                    host: scanData.target,
+                    ports: [],
+                    services: {},
+                    fingerprint: null
+                });
+            } catch (e) {
+                displayReconResults({ host: '', ports: [], services: {}, fingerprint: null });
+            }
+        }
 
     } catch (error) {
         clearInterval(progressInterval);
-        statusText.textContent = 'Reconnaissance failed: ' + error.message;
+
+        if (error.message.includes('scan_error')) {
+            // Backend reported an actual error during recon
+            progressFill.style.width = '100%';
+            progressFill.style.background = 'var(--severity-critical, #ff4757)';
+            statusText.innerHTML = `
+                <span style="color: var(--severity-critical, #ff4757)">✕ Reconnaissance failed</span>
+                <br><small style="opacity:0.7">The scan encountered an error. The target may be unreachable or invalid.</small>
+                <br><button class="btn btn-sm" style="margin-top:8px" onclick="skipToCheckSelection()">Skip → Select Checks Manually</button>
+            `;
+        } else if (error.message.includes('timed out')) {
+            progressFill.style.width = '100%';
+            progressFill.style.background = 'var(--severity-medium, #f39c12)';
+            statusText.innerHTML = `
+                <span style="color: var(--severity-medium, #f39c12)">⏱ Reconnaissance timed out</span>
+                <br><small style="opacity:0.7">Target may be unreachable or scanning is still running in background.</small>
+                <br><button class="btn btn-sm" style="margin-top:8px" onclick="skipToCheckSelection()">Skip → Select Checks Manually</button>
+            `;
+        } else {
+            statusText.textContent = 'Reconnaissance failed: ' + error.message;
+        }
     }
+}
+
+/**
+ * Skip recon and go straight to check selection.
+ */
+async function skipToCheckSelection() {
+    goToStep(3);
+    await loadApplicableChecks();
+}
+
+/**
+ * Poll scan status until a target phase is reached.
+ * @param {string} targetPhase - Phase to wait for (uppercase)
+ * @param {HTMLElement} statusEl - Status text element to update
+ * @param {string[]} messages - Cycling status messages
+ * @param {number} maxAttempts - Max poll attempts (default 15 = 30s)
+ * @returns {object} Progress data
+ */
+async function pollScanPhase(targetPhase, statusEl, messages, maxAttempts = 15) {
+    let attempt = 0;
+    let msgIdx = 0;
+
+    while (attempt < maxAttempts) {
+        await new Promise(r => setTimeout(r, 2000));
+        attempt++;
+
+        // Show elapsed time alongside status messages
+        const elapsed = attempt * 2;
+        if (messages && messages.length > 0 && attempt % 3 === 0) {
+            msgIdx = (msgIdx + 1) % messages.length;
+        }
+        if (statusEl && messages && messages.length > 0) {
+            statusEl.textContent = `${messages[msgIdx]} (${elapsed}s)`;
+        }
+
+        try {
+            const progress = await apiRequest(`/scans/${currentScanId}`);
+
+            const phaseOrder = ['IDLE', 'INITIALIZING', 'RECON', 'SELECTION', 'TESTING', 'REPORTING', 'COMPLETED', 'ERROR'];
+            const currentIdx = phaseOrder.indexOf(progress.phase);
+            const targetIdx = phaseOrder.indexOf(targetPhase);
+
+            if (progress.phase === 'ERROR') {
+                throw new Error('scan_error — reconnaissance failed on the backend');
+            }
+
+            if (currentIdx >= targetIdx) {
+                return progress;
+            }
+        } catch (e) {
+            if (e.message.includes('scan_error')) {
+                throw e; // Re-throw scan errors
+            }
+            console.debug('Poll attempt failed, retrying...', e);
+        }
+    }
+
+    throw new Error('Request timed out — target may be unreachable');
 }
 
 function displayReconResults(results) {
@@ -421,7 +683,7 @@ function updateSelectionCount() {
 
 async function executeChecks() {
     if (selectedChecks.size === 0) {
-        alert('Please select at least one check to execute');
+        showToast('Please select at least one check to execute', 'warning');
         return;
     }
 
@@ -445,21 +707,77 @@ async function executeChecks() {
 
         addLogEntry('Checks selected, starting execution...', 'info');
 
-        // Execute checks
-        const { findings, total } = await apiRequest(`/scans/${currentScanId}/execute`, {
-            method: 'POST'
-        });
+        // Fire-and-forget: kick off execution in background
+        fetch(`${API_BASE}/scans/${currentScanId}/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).catch(() => { });
 
-        execProgress.style.width = '100%';
-        execCurrent.textContent = selectedChecks.size;
+        // Poll for completion with live progress updates
+        const totalChecks = selectedChecks.size;
+        let lastCompleted = 0;
+        const checkNames = Array.from(selectedChecks);
 
-        addLogEntry(`Execution complete. Found ${findings.length} vulnerabilities.`,
-            findings.length > 0 ? 'error' : 'success');
+        const maxPollAttempts = 30; // 30 * 2s = 60s max
+        let pollAttempt = 0;
 
-        // Show results after short delay
-        setTimeout(() => {
-            displayResults(findings);
-        }, 1000);
+        while (pollAttempt < maxPollAttempts) {
+            await new Promise(r => setTimeout(r, 2000));
+            pollAttempt++;
+
+            try {
+                const progress = await apiRequest(`/scans/${currentScanId}`);
+
+                const completed = progress.completed_checks || 0;
+                const pct = totalChecks > 0 ? Math.round((completed / totalChecks) * 100) : 0;
+
+                execProgress.style.width = `${pct}%`;
+                execCurrent.textContent = completed;
+
+                // Log newly completed checks
+                if (completed > lastCompleted) {
+                    for (let i = lastCompleted; i < completed && i < checkNames.length; i++) {
+                        addLogEntry(`✓ Completed: ${checkNames[i]}`, 'success');
+                    }
+                    lastCompleted = completed;
+                }
+
+                if (progress.current_check) {
+                    addLogEntry(`Running: ${progress.current_check}...`, 'info');
+                }
+
+                // Check if execution is complete (phase moved to reporting/complete)
+                const phaseOrder = ['IDLE', 'INITIALIZING', 'RECON', 'SELECTION', 'TESTING', 'REPORTING', 'COMPLETED', 'ERROR'];
+                const phaseIdx = phaseOrder.indexOf(progress.phase);
+                if (phaseIdx >= phaseOrder.indexOf('REPORTING')) {
+                    // Execution done — fetch findings
+                    execProgress.style.width = '100%';
+                    execCurrent.textContent = totalChecks;
+
+                    // Fetch the actual findings from the scan
+                    let findings = [];
+                    try {
+                        const report = await apiRequest(`/reports/${currentScanId}/findings`);
+                        findings = report.findings || [];
+                    } catch (e) {
+                        // Fallback: findings_count from progress
+                        addLogEntry(`Completed with ${progress.findings_count || 0} findings`, 'info');
+                    }
+
+                    addLogEntry(`Execution complete. Found ${findings.length} vulnerabilities.`,
+                        findings.length > 0 ? 'error' : 'success');
+
+                    setTimeout(() => {
+                        displayResults(findings);
+                    }, 1000);
+                    return;
+                }
+            } catch (e) {
+                console.debug('Execution poll failed, retrying...', e);
+            }
+        }
+
+        addLogEntry('⏱ Execution timed out — checks may still be running in the background. Try viewing this scan from the Dashboard later.', 'error');
 
     } catch (error) {
         addLogEntry('Execution failed: ' + error.message, 'error');
@@ -540,7 +858,7 @@ async function downloadReport() {
         window.open(`${API_BASE}/reports/${currentScanId}/download?format=html`, '_blank');
 
     } catch (error) {
-        alert('Failed to generate report: ' + error.message);
+        showToast('Failed to generate report: ' + error.message, 'error');
     }
 }
 
@@ -604,7 +922,7 @@ async function downloadReportId(scanId) {
         });
         window.open(`${API_BASE}/reports/${scanId}/download?format=html`, '_blank');
     } catch (error) {
-        alert('Failed to generate report');
+        showToast('Failed to generate report', 'error');
     }
 }
 
@@ -615,7 +933,7 @@ async function deleteReport(scanId) {
         await apiRequest(`/reports/${scanId}`, { method: 'DELETE' });
         loadReports(); // Reload list
     } catch (error) {
-        alert('Failed to delete report: ' + error.message);
+        showToast('Failed to delete report: ' + error.message, 'error');
     }
 }
 
@@ -775,7 +1093,7 @@ async function launchPresetSimulation(presetId) {
         runSimulationStep(0);
     } catch (error) {
         hideLoading();
-        alert(`Failed to load ${meta.label} simulation: ` + error.message);
+        showToast(`Failed to load ${meta.label} simulation: ` + error.message, 'error');
     }
 }
 
@@ -1010,11 +1328,21 @@ function truncate(str, len) {
 }
 
 function formatDate(dateStr) {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    if (!dateStr) return '—';
+    // Backend sends UTC isoformat without 'Z' — append it so JS treats as UTC
+    let s = String(dateStr);
+    if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-', 10)) {
+        s += 'Z';
+    }
+    const d = new Date(s);
+    if (isNaN(d)) return dateStr; // fallback if unparseable
+    return d.toLocaleString('en-IN', {
+        day: '2-digit',
         month: 'short',
-        day: 'numeric',
+        year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        hour12: true
     });
 }
 
@@ -1025,8 +1353,58 @@ function escapeHtml(text) {
 }
 
 async function viewScan(scanId) {
-    // TODO: Implement scan details view
-    alert('View scan details: ' + scanId);
+    try {
+        showLoading('Loading scan...');
+        currentScanId = scanId;
+        sessionStorage.setItem('atlas_scan_id', scanId);
+
+        const progress = await apiRequest(`/scans/${scanId}`);
+        hideLoading();
+
+        showPage('new-scan');
+
+        // Map scan phase to wizard step
+        const phaseToStep = {
+            'IDLE': 1,
+            'INITIALIZING': 1,
+            'RECON': 2,
+            'SELECTION': 3,
+            'TESTING': 4,
+            'REPORTING': 5,
+            'COMPLETED': 5,
+            'ERROR': 1
+        };
+
+        const step = phaseToStep[progress.phase] || 1;
+
+        // Set the target input
+        document.getElementById('target-input').value = progress.target || '';
+
+        if (step === 1) {
+            goToStep(1);
+        } else if (step === 2) {
+            goToStep(2);
+            // Recon is in progress, poll for it
+            await runReconnaissance();
+        } else if (step >= 3) {
+            // Recon done, go to selection
+            goToStep(3);
+            await loadApplicableChecks();
+
+            if (step >= 4 && progress.findings_count > 0) {
+                // Already has results, jump to results
+                try {
+                    const report = await apiRequest(`/reports/${scanId}/findings`);
+                    displayResults(report.findings || []);
+                } catch (e) {
+                    goToStep(3); // Fallback to selection
+                }
+            }
+        }
+    } catch (error) {
+        hideLoading();
+        showToast('Failed to load scan: ' + error.message, 'error');
+    }
 }
 
 async function resumeScan(scanId) {
@@ -1034,7 +1412,7 @@ async function resumeScan(scanId) {
         await apiRequest(`/scans/${scanId}/resume`, { method: 'POST' });
         loadDashboard();
     } catch (error) {
-        alert('Failed to resume scan: ' + error.message);
+        showToast('Failed to resume scan: ' + error.message, 'error');
     }
 }
 
@@ -1131,8 +1509,19 @@ function updateUserProfile(user) {
  */
 function toggleUserMenu() {
     const userProfile = document.getElementById('user-profile');
-    if (userProfile) {
-        userProfile.classList.toggle('open');
+    if (!userProfile) return;
+    const isOpen = userProfile.classList.toggle('open');
+    if (isOpen) {
+        // Close when clicking anywhere outside
+        setTimeout(() => {
+            function closeOnOutsideClick(e) {
+                if (!userProfile.contains(e.target)) {
+                    userProfile.classList.remove('open');
+                    document.removeEventListener('click', closeOnOutsideClick, true);
+                }
+            }
+            document.addEventListener('click', closeOnOutsideClick, true);
+        }, 0);
     }
 }
 
@@ -1209,9 +1598,515 @@ function loadProfile() {
         roleBadge.className = 'user-role-badge ' + (currentUser.role === 'admin' ? 'admin' : 'pentester');
     }
 
-    // Attach event listeners for buttons if not already attached
-    // (Simple implementation: re-attaching is fine or check attribute)
-    document.querySelectorAll('.settings-card button').forEach(btn => {
-        btn.onclick = () => alert('This feature is coming soon!');
-    });
+    // Pre-fill edit forms
+    const editName = document.getElementById('edit-name');
+    const editEmail = document.getElementById('edit-email');
+    if (editName) editName.value = currentUser.name || '';
+    if (editEmail) editEmail.value = currentUser.email || '';
 }
+
+// ========== Scan Actions (Delete / Export / Cancel) ==========
+
+async function deleteScan(scanId) {
+    if (!confirm(`Delete scan ${scanId} and all associated data? This cannot be undone.`)) return;
+    try {
+        await apiRequest(`/scans/${scanId}`, { method: 'DELETE' });
+        showToast('Scan deleted successfully', 'success');
+        loadDashboard();
+    } catch (error) {
+        showToast('Failed to delete scan: ' + error.message, 'error');
+    }
+}
+
+async function exportScan(scanId) {
+    try {
+        const data = await apiRequest(`/scans/${scanId}/export`);
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `atlas-scan-${scanId}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        showToast('Failed to export scan: ' + error.message, 'error');
+    }
+}
+
+async function cancelScan(scanId) {
+    if (!confirm('Cancel this running scan?')) return;
+    try {
+        await apiRequest(`/scans/${scanId}/cancel`, { method: 'POST' });
+        loadDashboard();
+    } catch (error) {
+        showToast('Failed to cancel scan: ' + error.message, 'error');
+    }
+}
+
+// ========== Activity Log ==========
+
+async function loadActivityFeed() {
+    const container = document.getElementById('activity-feed');
+    // Skeleton loading
+    container.innerHTML = Array(5).fill('').map(() => `
+        <div class="activity-item">
+            <div class="skeleton" style="width:10px;height:10px;border-radius:50%;margin-top:5px;"></div>
+            <div class="activity-content">
+                <div class="skeleton skeleton-line w-75"></div>
+                <div class="skeleton skeleton-line w-30" style="margin-top:6px;"></div>
+            </div>
+        </div>
+    `).join('');
+
+    try {
+        const data = await apiRequest('/activity?limit=50');
+        const events = data.events || [];
+
+        if (events.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state-enhanced">
+                    <div class="empty-state-icon">📋</div>
+                    <h4>No activity yet</h4>
+                    <p>Events will appear here as you run scans.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = events.map((ev, idx) => {
+            const dotClass = ['scan_created', 'scan_completed', 'scan_cancelled', 'finding_discovered', 'error'].includes(ev.event_type)
+                ? ev.event_type : 'default';
+            return `
+                <div class="activity-item" style="animation-delay: ${idx * 0.04}s;">
+                    <div class="activity-dot ${dotClass}"></div>
+                    <div class="activity-content">
+                        <div class="activity-message">${escapeHtml(ev.message)}</div>
+                        <div class="activity-meta">
+                            ${ev.scan_id ? `<code>${ev.scan_id}</code> · ` : ''}
+                            ${formatDate(ev.timestamp)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (error) {
+        container.innerHTML = '<p class="empty-state">Failed to load activity feed.</p>';
+        console.error('Activity feed error:', error);
+    }
+}
+
+// ========== Scheduled Scans ==========
+
+async function loadSchedules() {
+    const tbody = document.getElementById('schedules-table-body');
+    try {
+        const data = await apiRequest('/scheduler');
+        const schedules = data.schedules || [];
+
+        if (schedules.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6">
+                        <div class="empty-state-enhanced">
+                            <div class="empty-state-icon">⏰</div>
+                            <h4>No scheduled scans</h4>
+                            <p>Create a recurring scan using the form above.</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = schedules.map(s => `
+            <tr>
+                <td><code>${s.id}</code></td>
+                <td>${truncate(s.target, 35)}</td>
+                <td><code>${s.cron_expr}</code></td>
+                <td>
+                    <label class="toggle-switch" style="transform: scale(0.8);">
+                        <input type="checkbox" ${s.enabled ? 'checked' : ''} onchange="toggleSchedule('${s.id}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </td>
+                <td>${s.last_run ? formatDate(s.last_run) : 'Never'}</td>
+                <td>
+                    <button class="btn btn-sm" onclick="deleteSchedule('${s.id}')" 
+                        style="color: var(--severity-critical); border-color: var(--severity-critical);">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+    } catch (error) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load schedules.</td></tr>';
+        console.error('Schedules error:', error);
+    }
+}
+
+async function createScheduledScan() {
+    const target = document.getElementById('schedule-target').value.trim();
+    const cron = document.getElementById('schedule-cron').value;
+
+    if (!target) {
+        showToast('Please enter a target URL', 'warning');
+        return;
+    }
+
+    try {
+        await apiRequest('/scheduler', {
+            method: 'POST',
+            body: JSON.stringify({ target, cron_expr: cron })
+        });
+        showToast('Schedule created successfully', 'success');
+        document.getElementById('schedule-target').value = '';
+        loadSchedules();
+    } catch (error) {
+        showToast('Failed to create schedule: ' + error.message, 'error');
+    }
+}
+
+async function toggleSchedule(scheduleId, enabled) {
+    try {
+        await apiRequest(`/scheduler/${scheduleId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ enabled })
+        });
+    } catch (error) {
+        showToast('Failed to update schedule: ' + error.message, 'error');
+        loadSchedules();
+    }
+}
+
+async function deleteSchedule(scheduleId) {
+    if (!confirm('Delete this scheduled scan?')) return;
+    try {
+        await apiRequest(`/scheduler/${scheduleId}`, { method: 'DELETE' });
+        showToast('Schedule deleted', 'success');
+        loadSchedules();
+    } catch (error) {
+        showToast('Failed to delete schedule: ' + error.message, 'error');
+    }
+}
+
+// ========== Profile Edit & Password Change ==========
+
+async function saveProfileChanges() {
+    const name = document.getElementById('edit-name').value.trim();
+    const email = document.getElementById('edit-email').value.trim();
+    const msgEl = document.getElementById('profile-edit-msg');
+
+    if (!name && !email) {
+        msgEl.innerHTML = '<span style="color: #ff6b6b;">Please fill in at least one field.</span>';
+        return;
+    }
+
+    try {
+        const body = {};
+        if (name) body.name = name;
+        if (email) body.email = email;
+
+        const result = await apiRequest('/auth/profile', {
+            method: 'PUT',
+            body: JSON.stringify(body)
+        });
+
+        // Update local user data
+        if (result.user) {
+            currentUser = { ...currentUser, ...result.user };
+            localStorage.setItem('atlas_user', JSON.stringify(currentUser));
+            updateUserProfile(currentUser);
+            loadProfile();
+        }
+
+        msgEl.innerHTML = '<span style="color: #00ff88;">✓ Profile updated successfully!</span>';
+        setTimeout(() => { msgEl.innerHTML = ''; }, 3000);
+
+    } catch (error) {
+        msgEl.innerHTML = `<span style="color: #ff6b6b;">Error: ${error.message}</span>`;
+    }
+}
+
+async function changeUserPassword() {
+    const currentPw = document.getElementById('current-password').value;
+    const newPw = document.getElementById('new-password').value;
+    const msgEl = document.getElementById('password-change-msg');
+
+    if (!currentPw || !newPw) {
+        msgEl.innerHTML = '<span style="color: #ff6b6b;">Please fill in both fields.</span>';
+        return;
+    }
+
+    if (newPw.length < 8) {
+        msgEl.innerHTML = '<span style="color: #ff6b6b;">New password must be at least 8 characters.</span>';
+        return;
+    }
+
+    try {
+        await apiRequest('/auth/password', {
+            method: 'PUT',
+            body: JSON.stringify({ current_password: currentPw, new_password: newPw })
+        });
+
+        document.getElementById('current-password').value = '';
+        document.getElementById('new-password').value = '';
+        msgEl.innerHTML = '<span style="color: #00ff88;">✓ Password changed successfully!</span>';
+        setTimeout(() => { msgEl.innerHTML = ''; }, 3000);
+
+    } catch (error) {
+        msgEl.innerHTML = `<span style="color: #ff6b6b;">Error: ${error.message}</span>`;
+    }
+}
+// ========== Real Web Terminal (xterm.js + WebSocket) ==========
+
+const WebTerminal = {
+    term: null,
+    fitAddon: null,
+    ws: null,
+    initialized: false,
+    _sessionTimer: null,
+    _reconnectAttempts: 0,
+    _maxReconnectAttempts: 5,
+
+    _initRetries: 0,
+
+    init() {
+        if (this.initialized && this.term) {
+            // Already initialized — just re-fit
+            setTimeout(() => this.fit(), 100);
+            return;
+        }
+
+        // Guard: xterm.js may not be loaded yet (deferred scripts)
+        if (typeof Terminal === 'undefined' || typeof FitAddon === 'undefined') {
+            if (this._initRetries < 10) {
+                this._initRetries++;
+                setTimeout(() => this.init(), 200);
+            } else {
+                console.error('xterm.js failed to load');
+            }
+            return;
+        }
+        this._initRetries = 0;
+
+        const container = document.getElementById('xterm-container');
+        if (!container) return;
+
+        // Clear any previous content
+        container.innerHTML = '';
+
+        // Create xterm.js instance
+        this.term = new Terminal({
+            cursorBlink: true,
+            cursorStyle: 'bar',
+            fontSize: 14,
+            fontFamily: '"Fira Code", "Cascadia Code", "JetBrains Mono", monospace',
+            theme: {
+                background: '#000000',
+                foreground: '#a0aec0',
+                cursor: '#00ff88',
+                cursorAccent: '#000000',
+                selectionBackground: 'rgba(0, 255, 136, 0.2)',
+                selectionForeground: '#ffffff',
+                black: '#0a0e1a',
+                red: '#ff4757',
+                green: '#00ff88',
+                yellow: '#ffd43b',
+                blue: '#00d4ff',
+                magenta: '#b794f6',
+                cyan: '#00d4ff',
+                white: '#e2e8f0',
+                brightBlack: '#4a5568',
+                brightRed: '#ff6b81',
+                brightGreen: '#2ed573',
+                brightYellow: '#fffa65',
+                brightBlue: '#70a1ff',
+                brightMagenta: '#d6a4ff',
+                brightCyan: '#7bed9f',
+                brightWhite: '#ffffff',
+            },
+            allowProposedApi: true,
+            scrollback: 5000,
+            convertEol: true,
+        });
+
+        // Load addons
+        this.fitAddon = new FitAddon.FitAddon();
+        this.term.loadAddon(this.fitAddon);
+
+        if (typeof WebLinksAddon !== 'undefined') {
+            this.term.loadAddon(new WebLinksAddon.WebLinksAddon());
+        }
+
+        // Open terminal in container
+        this.term.open(container);
+
+        // Fit to container
+        setTimeout(() => this.fit(), 50);
+
+        // Handle user input — send to WebSocket
+        this.term.onData((data) => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(data);
+            }
+        });
+
+        // Handle resize
+        this.term.onResize(({ cols, rows }) => {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+            }
+        });
+
+        // Watch for container resize
+        const resizeObserver = new ResizeObserver(() => this.fit());
+        resizeObserver.observe(container);
+
+        // Connect WebSocket
+        this.connect();
+
+        this.initialized = true;
+    },
+
+    fit() {
+        if (this.fitAddon && this.term) {
+            try {
+                this.fitAddon.fit();
+            } catch (e) {
+                // Ignore fit errors during transitions
+            }
+        }
+    },
+
+    connect() {
+        const token = localStorage.getItem('atlas_token');
+        if (!token) {
+            this.term.writeln('\r\n\x1b[31m[ERROR] Not authenticated. Please log in first.\x1b[0m\r\n');
+            this.updateStatus('ERROR', 'red');
+            return;
+        }
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/api/terminal/ws?token=${encodeURIComponent(token)}`;
+
+        this.updateStatus('CONNECTING', 'yellow');
+
+        this.ws = new WebSocket(wsUrl);
+
+        this.ws.onopen = () => {
+            this._reconnectAttempts = 0;
+            this.updateStatus('CONNECTED', 'green');
+
+            // Send initial resize
+            setTimeout(() => {
+                this.fit();
+                if (this.term) {
+                    this.ws.send(JSON.stringify({
+                        type: 'resize',
+                        cols: this.term.cols,
+                        rows: this.term.rows,
+                    }));
+                }
+            }, 100);
+        };
+
+        this.ws.onmessage = (event) => {
+            if (this.term) {
+                this.term.write(event.data);
+            }
+        };
+
+        this.ws.onclose = (event) => {
+            if (event.code === 4003) {
+                this.term.writeln('\r\n\x1b[31m[ACCESS DENIED] Terminal requires pentester or admin role.\x1b[0m\r\n');
+                this.updateStatus('DENIED', 'red');
+                return;
+            }
+
+            this.updateStatus('DISCONNECTED', 'red');
+
+            // Auto-reconnect with backoff
+            if (this._reconnectAttempts < this._maxReconnectAttempts) {
+                this._reconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(2, this._reconnectAttempts), 10000);
+                this.term.writeln(`\r\n\x1b[33m[DISCONNECTED] Reconnecting in ${delay / 1000}s... (attempt ${this._reconnectAttempts}/${this._maxReconnectAttempts})\x1b[0m`);
+                setTimeout(() => this.connect(), delay);
+            } else {
+                this.term.writeln('\r\n\x1b[31m[DISCONNECTED] Max reconnect attempts reached. Refresh the page.\x1b[0m\r\n');
+            }
+        };
+
+        this.ws.onerror = () => {
+            this.updateStatus('ERROR', 'red');
+        };
+    },
+
+    updateStatus(text, color) {
+        const el = document.getElementById('ws-status');
+        if (el) {
+            el.textContent = text;
+            // Update the indicator dot color
+            el.style.setProperty('--status-color', color === 'green' ? '#00ff88' : color === 'yellow' ? '#ffd43b' : '#ff4757');
+        }
+    },
+
+    clear() {
+        if (this.term) {
+            this.term.clear();
+        }
+    },
+
+    destroy() {
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
+        }
+        if (this._sessionTimer) {
+            clearInterval(this._sessionTimer);
+            this._sessionTimer = null;
+        }
+        // Don't dispose term — keep it alive for re-navigation
+    }
+};
+
+function initWebTerminal() {
+    WebTerminal.init();
+
+    // Update title with actual username
+    const titleEl = document.getElementById('web-term-title');
+    if (currentUser && titleEl) {
+        const user = currentUser.username || 'pentester';
+        titleEl.textContent = `${user}@atlas ~ bash`;
+    }
+
+    // Session timer
+    if (!WebTerminal._sessionTimer) {
+        const startTime = Date.now();
+        WebTerminal._sessionTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = String(elapsed % 60).padStart(2, '0');
+            const el = document.getElementById('web-term-session-time');
+            if (el) el.textContent = `SESSION: ${mins}:${secs}`;
+        }, 1000);
+    }
+
+    // Focus the terminal
+    setTimeout(() => WebTerminal.term?.focus(), 200);
+}
+
+function webTermClear() {
+    WebTerminal.clear();
+}
+
+function webTermFullscreen() {
+    const wrapper = document.getElementById('web-terminal-wrapper');
+    if (wrapper) {
+        wrapper.classList.toggle('fullscreen');
+        // Re-fit after transition
+        setTimeout(() => WebTerminal.fit(), 300);
+    }
+}
+

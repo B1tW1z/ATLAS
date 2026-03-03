@@ -4,7 +4,8 @@ ATLAS API Schemas
 Pydantic models for request/response validation.
 """
 
-from pydantic import BaseModel, Field, HttpUrl
+import re
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -47,6 +48,27 @@ class ScanCreate(BaseModel):
     wordlist: Optional[str] = Field(default=None, description="Path to custom wordlist for enumeration")
     options: Optional[Dict[str, Any]] = Field(default=None, description="Optional scan configuration")
 
+    @field_validator("target")
+    @classmethod
+    def validate_target(cls, v: str) -> str:
+        """Validate target is a valid URL or IP address"""
+        v = v.strip()
+        if not v:
+            raise ValueError("Target cannot be empty")
+        # Allow http/https URLs
+        if re.match(r'^https?://', v):
+            return v
+        # Allow IP addresses (v4) with optional port
+        if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$', v):
+            return v
+        # Allow localhost with optional port
+        if re.match(r'^localhost(:\d+)?', v):
+            return f"http://{v}"
+        raise ValueError(
+            "Target must be a valid URL (http:// or https://) or IP address. "
+            f"Got: '{v}'"
+        )
+
 
 class CheckSelection(BaseModel):
     """Request to select checks for execution"""
@@ -56,6 +78,40 @@ class CheckSelection(BaseModel):
 class ReportRequest(BaseModel):
     """Request to generate a report"""
     format: str = Field(default="html", description="Report format (html/json)")
+
+
+class ScanNotesUpdate(BaseModel):
+    """Request to update scan notes/tags"""
+    notes: Optional[str] = Field(default=None, description="Scan notes or comments")
+    tags: Optional[List[str]] = Field(default=None, description="Tags for categorization")
+
+
+class ProfileUpdate(BaseModel):
+    """Request to update user profile"""
+    name: Optional[str] = Field(default=None, description="Display name")
+    email: Optional[str] = Field(default=None, description="Email address")
+
+
+class PasswordChange(BaseModel):
+    """Request to change password"""
+    current_password: str = Field(..., description="Current password")
+    new_password: str = Field(..., description="New password", min_length=6)
+
+
+class ScheduledScanCreate(BaseModel):
+    """Request to create a scheduled scan"""
+    target: str = Field(..., description="Target URL or IP")
+    cron_expr: str = Field(..., description="Cron expression (e.g. '0 */6 * * *')")
+    enabled: bool = Field(default=True, description="Whether schedule is active")
+    options: Optional[Dict[str, Any]] = Field(default=None, description="Scan options")
+
+
+class ScheduledScanUpdate(BaseModel):
+    """Request to update a scheduled scan"""
+    target: Optional[str] = None
+    cron_expr: Optional[str] = None
+    enabled: Optional[bool] = None
+    options: Optional[Dict[str, Any]] = None
 
 
 # ========== Response Models ==========

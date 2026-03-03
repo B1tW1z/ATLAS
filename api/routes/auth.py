@@ -464,3 +464,85 @@ async def github_auth(response: Response):
             "role": "pentester"
         }
     )
+
+
+@router.put("/profile")
+async def update_profile(request: Request):
+    """
+    Update current user's profile (name, email).
+    
+    Requires valid session. Only updates provided fields.
+    """
+    db = get_db()
+    username = get_current_user(request)
+    
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    user = db.get_user_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    body = await request.json()
+    updates = {}
+    
+    if "name" in body and body["name"]:
+        updates["name"] = body["name"].strip()
+    if "email" in body and body["email"]:
+        new_email = body["email"].lower().strip()
+        # Check if email is already taken by another user
+        existing = db.get_user_by_email(new_email)
+        if existing and existing.id != user.id:
+            raise HTTPException(status_code=400, detail="Email already in use")
+        updates["email"] = new_email
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    db.update_user(user.id, **updates)
+    
+    return {
+        "success": True,
+        "message": "Profile updated",
+        "user": {
+            "username": username,
+            "name": updates.get("name", user.name),
+            "email": updates.get("email", user.email),
+            "role": user.role
+        }
+    }
+
+
+@router.put("/password")
+async def change_password(request: Request):
+    """
+    Change current user's password.
+    
+    Requires valid session and current password verification.
+    """
+    db = get_db()
+    username = get_current_user(request)
+    
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    user = db.get_user_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    body = await request.json()
+    current_password = body.get("current_password", "")
+    new_password = body.get("new_password", "")
+    
+    # Verify current password
+    if hash_password(current_password) != user.password_hash:
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Validate new password
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="New password must be at least 8 characters")
+    
+    # Update password
+    db.update_user_password(user.id, hash_password(new_password))
+    
+    return {"success": True, "message": "Password changed successfully"}

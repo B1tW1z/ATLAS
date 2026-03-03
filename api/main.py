@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from api.routes import scans, checks, reports, presets, auth
+from api.routes import scans, checks, reports, presets, auth, dashboard, activity, scheduler, terminal
 
 
 @asynccontextmanager
@@ -35,9 +35,16 @@ async def lifespan(app: FastAPI):
     registry = CheckRegistry()
     print(f"Loaded {len(registry.get_all_checks())} vulnerability checks")
     
+    # Start scheduler worker
+    from atlas.core.scheduler_worker import get_scheduler_worker
+    worker = get_scheduler_worker()
+    await worker.start()
+    print("Scheduler worker started")
+    
     yield
     
     # Shutdown
+    await worker.stop()
     print("ATLAS API Shutting down...")
 
 
@@ -67,11 +74,37 @@ app.include_router(checks.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(presets.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
+app.include_router(activity.router, prefix="/api")
+app.include_router(scheduler.router, prefix="/api")
+app.include_router(terminal.router, prefix="/api")
 
 # Mount static files for Web UI
 web_dir = Path(__file__).parent.parent / "web"
 if web_dir.exists():
     app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
+
+
+# Request logging middleware
+import time
+import logging
+
+req_logger = logging.getLogger("atlas.requests")
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all API requests with timing"""
+    start = time.time()
+    response = await call_next(request)
+    duration_ms = (time.time() - start) * 1000
+    
+    if request.url.path.startswith("/api"):
+        req_logger.info(
+            f"{request.method} {request.url.path} → {response.status_code} "
+            f"({duration_ms:.0f}ms)"
+        )
+    
+    return response
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -140,34 +173,29 @@ async def test_403_page():
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    """Serve main Web UI"""
+    """Serve landing page"""
+    landing_path = web_dir / "landing.html"
+    if landing_path.exists():
+        return HTMLResponse(content=landing_path.read_text(encoding='utf-8'))
+    return HTMLResponse(content="<h1>Landing page not found</h1>", status_code=404)
+
+
+@app.get("/landing", response_class=HTMLResponse)
+async def landing_alias():
+    """Alias for landing page"""
+    landing_path = web_dir / "landing.html"
+    if landing_path.exists():
+        return HTMLResponse(content=landing_path.read_text(encoding='utf-8'))
+    return HTMLResponse(content="<h1>Landing page not found</h1>", status_code=404)
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page():
+    """Serve main dashboard Web UI"""
     index_path = web_dir / "index.html"
     if index_path.exists():
         return HTMLResponse(content=index_path.read_text(encoding='utf-8'))
-    
-    return HTMLResponse(content="""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>ATLAS</title>
-        <style>
-            body { font-family: system-ui; background: #1a1a2e; color: #eee; 
-                   display: flex; justify-content: center; align-items: center; 
-                   min-height: 100vh; margin: 0; }
-            .container { text-align: center; }
-            h1 { color: #4fc3f7; font-size: 3rem; }
-            a { color: #4fc3f7; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1> ATLAS</h1>
-            <p> Advanced Testing Lab for Application Security </p>
-            <p><a href="/api/docs">API Documentation</a></p>
-        </div>
-    </body>
-    </html>
-    """)
+    return HTMLResponse(content="<h1>Dashboard not found</h1>", status_code=404)
 
 
 @app.get("/api/health")

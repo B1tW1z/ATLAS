@@ -25,7 +25,7 @@ class Config:
     
     # Nmap Settings
     nmap_path: Optional[str] = None  # Auto-detect if None
-    nmap_default_args: str = "-sV -sC"
+    nmap_default_args: str = "-sV -T4 --top-ports 100"
     nmap_timeout: int = 300  # 5 minutes
     
     # Web UI Settings

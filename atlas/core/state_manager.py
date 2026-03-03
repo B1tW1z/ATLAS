@@ -141,6 +141,10 @@ class StateManager:
         """
         Load an existing scan session.
         
+        Rebuilds full ScanState from DB by loading the session record
+        plus recon results, executed checks, and findings from their
+        respective tables.
+        
         Args:
             scan_id: Session identifier
             
@@ -148,11 +152,55 @@ class StateManager:
             ScanState if found, None otherwise
         """
         if self._database:
-            data = self._database.get_scan_session(scan_id)
-            if data:
-                self._current_state = ScanState.from_dict(data)
+            session = self._database.get_scan_session(scan_id)
+            if session:
+                # Load recon results from DB
+                recon_results = self._database.get_recon_results(scan_id)
+                open_ports = [r.port for r in recon_results]
+                services = {}
+                for r in recon_results:
+                    services[r.port] = {
+                        "protocol": r.protocol,
+                        "service": r.service,
+                        "version": r.version or "",
+                        "product": r.product or "",
+                        "extra_info": r.extra_info or "",
+                        "state": r.state or "open"
+                    }
+                
+                # Load executed checks from DB
+                executed_checks_list = self._database.get_executed_checks(scan_id)
+                executed_check_ids = [ec.check_id for ec in executed_checks_list]
+                
+                # Load findings from DB
+                findings_list = self._database.get_findings(scan_id)
+                findings = [f.to_dict() for f in findings_list]
+                
+                # Determine if recon was completed
+                recon_completed = session.phase in ("SELECTION", "TESTING", "REPORTING", "COMPLETE")
+                
+                # Build the state dict for ScanState.from_dict
+                # Recover selected_checks from metadata if persisted
+                saved_selected = (session.metadata or {}).get("selected_checks", [])
+                state_data = {
+                    "scan_id": session.id,
+                    "target": session.target,
+                    "created_at": session.created_at.isoformat(),
+                    "updated_at": session.updated_at.isoformat(),
+                    "phase": session.phase,
+                    "recon_completed": recon_completed,
+                    "open_ports": open_ports,
+                    "services": services,
+                    "target_fingerprint": None,
+                    "selected_checks": saved_selected,
+                    "executed_checks": executed_check_ids,
+                    "findings": findings,
+                    "metadata": session.metadata or {},
+                }
+                
+                self._current_state = ScanState.from_dict(state_data)
                 self._phase_controller.current_phase = self._current_state.phase
-                logger.info(f"Loaded scan session: {scan_id}")
+                logger.info(f"Loaded scan session: {scan_id} (phase={session.phase}, ports={len(open_ports)}, checks={len(executed_check_ids)})")
                 return self._current_state
         
         logger.warning(f"Scan session not found: {scan_id}")
@@ -231,9 +279,11 @@ class StateManager:
                     logger.error(f"Failed to persist recon results: {e}")
 
     def set_selected_checks(self, check_ids: List[str]):
-        """Set user-selected checks"""
+        """Set user-selected checks and persist to metadata"""
         if self._current_state:
             self._current_state.selected_checks = check_ids
+            # Store in metadata so they survive server restarts
+            self._current_state.metadata["selected_checks"] = check_ids
             self.save_session()
 
 

@@ -91,8 +91,12 @@ class ReconScanner:
                 "fingerprint": None
             }
             
-            if host in nm.all_hosts():
-                host_info = nm[host]
+            # Iterate over ALL scanned hosts (nmap may resolve hostname to IP)
+            scanned_hosts = nm.all_hosts()
+            if scanned_hosts:
+                # Use the first scanned host (nmap resolves 'localhost' to '127.0.0.1')
+                actual_host = scanned_hosts[0]
+                host_info = nm[actual_host]
                 
                 # Extract port/service info
                 for proto in host_info.all_protocols():

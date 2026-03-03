@@ -67,7 +67,7 @@ const LoginManager = {
                 if (data.user) {
                     localStorage.setItem('atlas_user', JSON.stringify(data.user));
                 }
-                window.location.href = '/';
+                window.location.href = '/dashboard';
             } else {
                 this.showError(errorDiv, data.detail || 'Google sign-in failed');
             }
@@ -99,7 +99,7 @@ const LoginManager = {
                 if (data.user) {
                     localStorage.setItem('atlas_user', JSON.stringify(data.user));
                 }
-                window.location.href = '/';
+                window.location.href = '/dashboard';
             } else {
                 this.showError(errorDiv, data.detail || 'Microsoft sign-in failed');
             }
@@ -131,7 +131,7 @@ const LoginManager = {
                 if (data.user) {
                     localStorage.setItem('atlas_user', JSON.stringify(data.user));
                 }
-                window.location.href = '/';
+                window.location.href = '/dashboard';
             } else {
                 this.showError(errorDiv, data.detail || 'GitHub sign-in failed');
             }
@@ -204,7 +204,7 @@ const LoginManager = {
                     localStorage.setItem('atlas_user', JSON.stringify(data.user));
                 }
                 // Redirect to dashboard
-                window.location.href = '/';
+                window.location.href = '/dashboard';
             } else {
                 this.showError(errorDiv, data.detail || 'Invalid username or password');
             }
@@ -238,7 +238,7 @@ const LoginManager = {
             });
 
             if (response.ok) {
-                window.location.href = '/';
+                window.location.href = '/dashboard';
             } else {
                 // Token invalid, clear storage
                 localStorage.removeItem('atlas_token');

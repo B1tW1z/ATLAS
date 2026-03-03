@@ -321,9 +321,26 @@ class ATLASEngine:
             self._event_callbacks[event].remove(callback)
     
     def _emit_event(self, event: str, data: Any):
-        """Emit event to all listeners"""
+        """Emit event to all listeners and persist to database"""
         for callback in self._event_callbacks.get(event, []):
             try:
                 callback(data)
             except Exception as e:
                 logger.error(f"Event callback error: {e}")
+        
+        # Persist to database activity log
+        try:
+            if self._database and self.state:
+                messages = {
+                    "scan_started": f"Scan started for {data.get('target', 'unknown')}",
+                    "recon_completed": f"Reconnaissance completed — {len(data.get('ports', []))} ports found",
+                    "check_started": f"Check started: {data.get('check_id', '')}",
+                    "check_completed": f"Check completed: {data.get('check_id', '')}",
+                    "finding_discovered": f"Finding: {data.get('title', 'Unknown')} ({data.get('severity', '')})",
+                    "scan_completed": f"Scan completed — {data.get('findings_count', 0)} findings",
+                    "error": f"Error in {data.get('phase', 'unknown')}: {data.get('error', '')}",
+                }
+                msg = messages.get(event, str(data))
+                self._database.add_scan_event(self.state.scan_id, event, msg)
+        except Exception as e:
+            logger.debug(f"Failed to persist event: {e}")
