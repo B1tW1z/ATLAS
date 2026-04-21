@@ -5,6 +5,11 @@
  */
 
 const LoginManager = {
+    OAUTH_PROVIDERS: {
+        google: { endpoint: '/api/auth/oauth/google/start', label: 'Google' },
+        microsoft: { endpoint: '/api/auth/oauth/microsoft/start', label: 'Microsoft' },
+        github: { endpoint: '/api/auth/oauth/github/start', label: 'GitHub' }
+    },
     /**
      * Initialize login page functionality
      */
@@ -29,114 +34,38 @@ const LoginManager = {
 
         const googleBtn = document.getElementById('google-login-btn');
         if (googleBtn) {
-            googleBtn.addEventListener('click', () => this.handleGoogleLogin());
+            googleBtn.addEventListener('click', () => this.handleOAuthLogin('google'));
         }
 
         const microsoftBtn = document.getElementById('microsoft-login-btn');
         if (microsoftBtn) {
-            microsoftBtn.addEventListener('click', () => this.handleMicrosoftLogin());
+            microsoftBtn.addEventListener('click', () => this.handleOAuthLogin('microsoft'));
         }
 
         const githubBtn = document.getElementById('github-login-btn');
         if (githubBtn) {
-            githubBtn.addEventListener('click', () => this.handleGithubLogin());
+            githubBtn.addEventListener('click', () => this.handleOAuthLogin('github'));
         }
     },
 
     /**
-     * Handle Google login
+     * Execute shared social sign-in flow
      */
-    async handleGoogleLogin() {
-        const errorDiv = document.getElementById('login-error');
-
-        // For demo: simulate Google login with a demo user
-        try {
-            const response = await fetch('/api/auth/google', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                if (data.token) {
-                    localStorage.setItem('atlas_token', data.token);
-                }
-                if (data.user) {
-                    localStorage.setItem('atlas_user', JSON.stringify(data.user));
-                }
-                window.location.href = '/dashboard';
-            } else {
-                this.showError(errorDiv, data.detail || 'Google sign-in failed');
-            }
-        } catch (error) {
-            this.showError(errorDiv, 'Google sign-in is not configured yet');
-        }
+    async handleOAuthLogin(providerKey) {
+        const provider = this.OAUTH_PROVIDERS[providerKey];
+        if (!provider) return;
+        window.location.href = provider.endpoint;
     },
 
     /**
-     * Handle Microsoft login
+     * Persist auth token and user details
      */
-    async handleMicrosoftLogin() {
-        const errorDiv = document.getElementById('login-error');
-
-        try {
-            const response = await fetch('/api/auth/microsoft', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                if (data.token) {
-                    localStorage.setItem('atlas_token', data.token);
-                }
-                if (data.user) {
-                    localStorage.setItem('atlas_user', JSON.stringify(data.user));
-                }
-                window.location.href = '/dashboard';
-            } else {
-                this.showError(errorDiv, data.detail || 'Microsoft sign-in failed');
-            }
-        } catch (error) {
-            this.showError(errorDiv, 'Microsoft sign-in is not configured yet');
+    persistSession(data) {
+        if (data.token) {
+            localStorage.setItem('atlas_token', data.token);
         }
-    },
-
-    /**
-     * Handle GitHub login
-     */
-    async handleGithubLogin() {
-        const errorDiv = document.getElementById('login-error');
-
-        try {
-            const response = await fetch('/api/auth/github', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                if (data.token) {
-                    localStorage.setItem('atlas_token', data.token);
-                }
-                if (data.user) {
-                    localStorage.setItem('atlas_user', JSON.stringify(data.user));
-                }
-                window.location.href = '/dashboard';
-            } else {
-                this.showError(errorDiv, data.detail || 'GitHub sign-in failed');
-            }
-        } catch (error) {
-            this.showError(errorDiv, 'GitHub sign-in is not configured yet');
+        if (data.user) {
+            localStorage.setItem('atlas_user', JSON.stringify(data.user));
         }
     },
 
@@ -179,7 +108,6 @@ const LoginManager = {
         const password = document.getElementById('password').value;
         const remember = document.getElementById('remember')?.checked || false;
 
-        // Disable button and show loading state
         loginBtn.disabled = true;
         loginBtn.textContent = 'Logging in...';
         errorDiv.classList.remove('show');
@@ -196,17 +124,14 @@ const LoginManager = {
             const data = await response.json();
 
             if (response.ok) {
-                // Store token
-                if (data.token) {
-                    localStorage.setItem('atlas_token', data.token);
-                }
-                if (data.user) {
-                    localStorage.setItem('atlas_user', JSON.stringify(data.user));
-                }
-                // Redirect to dashboard
+                this.persistSession(data);
                 window.location.href = '/dashboard';
             } else {
-                this.showError(errorDiv, data.detail || 'Invalid username or password');
+                if (response.status === 429) {
+                    this.showError(errorDiv, data.detail || 'Too many login attempts. Please try again later.');
+                } else {
+                    this.showError(errorDiv, data.detail || 'Invalid username or password');
+                }
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -240,12 +165,11 @@ const LoginManager = {
             if (response.ok) {
                 window.location.href = '/dashboard';
             } else {
-                // Token invalid, clear storage
                 localStorage.removeItem('atlas_token');
                 localStorage.removeItem('atlas_user');
             }
         } catch (error) {
-            // Connection error, let user try to login
+            // Network failure is non-fatal here; user can still submit login.
             console.error('Session verification error:', error);
         }
     }

@@ -4,6 +4,8 @@ ATLAS FastAPI Application
 Main entry point for the ATLAS Web API.
 """
 
+import logging
+import secrets
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -12,11 +14,15 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi import _rate_limit_exceeded_handler
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from api.routes import scans, checks, reports, presets, auth, dashboard, activity, scheduler, terminal
+from atlas.utils.config import get_config
 
 
 @asynccontextmanager
@@ -58,11 +64,15 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan
 )
+config = get_config()
+app.state.limiter = auth.limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=config.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -90,6 +100,7 @@ import time
 import logging
 
 req_logger = logging.getLogger("atlas.requests")
+error_logger = logging.getLogger("atlas.errors")
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -101,10 +112,69 @@ async def log_requests(request: Request, call_next):
     if request.url.path.startswith("/api"):
         req_logger.info(
             f"{request.method} {request.url.path} → {response.status_code} "
-            f"({duration_ms:.0f}ms)"
+            f"({duration_ms:.0f}ms) ip={request.client.host if request.client else 'unknown'} "
+            f'ua="{request.headers.get("user-agent", "-")[:120]}"'
         )
     
     return response
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' ws: wss: https:; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    return response
+
+
+@app.middleware("http")
+async def csrf_middleware(request: Request, call_next):
+    unsafe_methods = {"POST", "PUT", "PATCH", "DELETE"}
+    exempt_paths = {
+        "/api/auth/login",
+        "/api/auth/signup",
+        "/api/auth/oauth/google/start",
+        "/api/auth/oauth/microsoft/start",
+        "/api/auth/oauth/github/start",
+        "/api/auth/oauth/google/callback",
+        "/api/auth/oauth/microsoft/callback",
+        "/api/auth/oauth/github/callback",
+        "/api/auth/csrf",
+        "/api/health",
+    }
+    if request.method in unsafe_methods and request.url.path.startswith("/api"):
+        if request.url.path not in exempt_paths:
+            csrf_cookie = request.cookies.get(config.csrf_cookie_name)
+            csrf_header = request.headers.get("x-csrf-token")
+            if not csrf_cookie or not csrf_header or not secrets.compare_digest(csrf_cookie, csrf_header):
+                return JSONResponse(status_code=403, content={"error": "Forbidden", "detail": "Invalid CSRF token"})
+    return await call_next(request)
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={
+            "error": "Too Many Requests",
+            "detail": "Rate limit exceeded. Try again in a few minutes."
+        }
+    )
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -238,25 +308,33 @@ async def forbidden_handler(request: Request, exc: StarletteHTTPException):
 @app.exception_handler(500)
 async def server_error_handler(request: Request, exc: Exception):
     """Custom 500 error handler"""
+    error_logger.exception("Unhandled server error at path=%s", request.url.path)
     if request.url.path.startswith("/api"):
-        return JSONResponse(status_code=500, content={"error": "Internal Server Error", "detail": str(exc)})
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal Server Error", "detail": "An unexpected error occurred"}
+        )
         
     error_path = web_dir / "error" / "500.html"
     if error_path.exists():
         return HTMLResponse(content=error_path.read_text(encoding='utf-8'), status_code=500)
-    return HTMLResponse(content=f"<h1>500 Internal Server Error</h1><p>{str(exc)}</p>", status_code=500)
+    return HTMLResponse(content="<h1>500 Internal Server Error</h1>", status_code=500)
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler"""
+    error_logger.exception("Unhandled exception at path=%s", request.url.path)
     if request.url.path.startswith("/api"):
-        return JSONResponse(status_code=500, content={"error": "Internal Server Error", "detail": str(exc)})
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal Server Error", "detail": "An unexpected error occurred"}
+        )
         
     error_path = web_dir / "error" / "500.html"
     if error_path.exists():
         return HTMLResponse(content=error_path.read_text(encoding='utf-8'), status_code=500)
-    return HTMLResponse(content=f"<h1>500 Internal Server Error</h1><p>{str(exc)}</p>", status_code=500)
+    return HTMLResponse(content="<h1>500 Internal Server Error</h1>", status_code=500)
 
 
 if __name__ == "__main__":

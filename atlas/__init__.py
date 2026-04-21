@@ -1,5 +1,5 @@
 """
-ATLAS - Automated Threat and Lifecycle Assessment System
+ATLAS - Advanced Testing Lab for Application Security
 
 A guided vulnerability assessment framework for web and IoT applications.
 """

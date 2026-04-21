@@ -17,7 +17,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 from rich import print as rprint
 
-# Add parent to path for imports
+# Allow direct execution (`python cli/main.py`) without package install.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from atlas.core.engine import ATLASEngine
@@ -71,21 +71,17 @@ def scan(
     
     console.print(f"\n[bold green]Starting scan for target:[/] {target}\n")
     
-    # Initialize
     db = Database()
     engine = ATLASEngine(database=db)
     
     async def run_scan():
-        # Start scan
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console
         ) as progress:
-            # Initialize
             task = progress.add_task("Initializing scan...", total=None)
             
-            # Prepare options
             options = {}
             if wordlist:
                 options["wordlist"] = wordlist
@@ -93,23 +89,19 @@ def scan(
             state = await engine.start_scan(target, options)
             console.print(f"[dim]Scan ID: {state.scan_id}[/]")
             
-            # Reconnaissance
             progress.update(task, description="Running reconnaissance...")
             recon_results = await engine.run_reconnaissance()
             
             progress.update(task, description="Reconnaissance complete!")
         
-        # Display recon results
         display_recon_results(recon_results)
         
-        # Get available checks
         checks = engine.get_available_checks()
         
         if not checks:
             console.print("[yellow]No applicable checks found for this target[/]")
             return
         
-        # Display and select checks
         display_available_checks(checks)
         
         if auto:
@@ -124,15 +116,12 @@ def scan(
         
         engine.select_checks(selected)
         
-        # Execute checks
         console.print(f"\n[bold cyan]Executing {len(selected)} vulnerability checks...[/]\n")
         
         findings = await engine.execute_checks()
         
-        # Display findings
         display_findings(findings)
         
-        # Generate report
         if output or findings:
             console.print("\n[bold]Generating report...[/]")
             report_path = await engine.generate_report(format=format)
@@ -140,7 +129,6 @@ def scan(
         
         console.print("\n[bold green]Scan complete![/]")
     
-    # Run async
     asyncio.run(run_scan())
 
 
@@ -234,10 +222,26 @@ def report(
         return
     
     findings = db.get_findings(scan_id)
+    recon_results = db.get_recon_results(scan_id)
     console.print(f"Found {len(findings)} findings for scan {scan_id}")
-    
-    # TODO: Generate report using ReportGenerator
-    console.print("[yellow]Report generation - use the full scan workflow[/]")
+
+    from atlas.reporting.generator import ReportGenerator
+    generator = ReportGenerator()
+
+    async def do_generate():
+        return await generator.generate_from_data(
+            scan_id=scan_id,
+            target=session.target,
+            findings=findings,
+            recon_results=recon_results,
+            format=format
+        )
+
+    try:
+        report_path = asyncio.run(do_generate())
+        console.print(f"[green]Report generated:[/] {report_path}")
+    except Exception as exc:
+        console.print(f"[red]Failed to generate report:[/] {exc}")
 
 
 @app.command()
@@ -286,8 +290,6 @@ def checks():
         console.print(table)
 
 
-# Helper functions
-
 def display_recon_results(results: dict):
     """Display reconnaissance results"""
     console.print("\n[bold cyan]=== Reconnaissance Results ===[/]\n")
@@ -316,7 +318,6 @@ def display_available_checks(checks: list):
     """Display available checks for selection"""
     console.print("\n[bold cyan]=== Available Vulnerability Checks ===[/]\n")
     
-    # Group by category
     by_category = {}
     for check in checks:
         cat = check["category"]
@@ -366,7 +367,6 @@ def prompt_check_selection(checks: list) -> list:
     
     try:
         indices = [int(x.strip()) for x in selection.split(",")]
-        # Convert 1-indexed to 0-indexed
         return [check_ids[i-1] for i in indices if 0 < i <= len(check_ids)]
     except (ValueError, IndexError):
         console.print("[red]Invalid selection[/]")
@@ -403,7 +403,7 @@ def display_findings(findings: list):
 
 
 # ============================================================================
-# DEMO MODE - Preset Vulnerable Targets
+# Demo mode for curated vulnerable targets
 # ============================================================================
 
 @app.command()
@@ -423,7 +423,6 @@ def demo(
     """
     print_banner()
     
-    # List presets if none specified
     if not preset:
         console.print("\n[bold cyan]=== Available Demo Targets ===[/]\n")
         
@@ -442,7 +441,6 @@ def demo(
         selection = Prompt.ask("Select target", choices=[str(i) for i in range(len(presets) + 1)])
         
         if selection == "0":
-            # Custom target - use regular scan
             custom_url = Prompt.ask("Enter target URL")
             console.print("\n[yellow]Switching to standard scan mode...[/]\n")
             scan(custom_url, auto=False, output=None, format="html", wordlist=None)
@@ -450,17 +448,14 @@ def demo(
         
         preset = presets[int(selection) - 1].id
     
-    # Load preset
     target = get_preset(preset)
     if not target:
         console.print(f"[red]Preset '{preset}' not found[/]")
         console.print(f"[dim]Available: {', '.join([p.id for p in list_presets()])}[/]")
         return
     
-    # Display preset info
     display_preset_info(target)
     
-    # Get target URL
     url = target_url or target.default_url
     console.print(f"\n[bold]Target URL:[/] {url}")
     
@@ -468,17 +463,14 @@ def demo(
         if Confirm.ask("Use a different URL?", default=False):
             url = Prompt.ask("Enter target URL", default=url)
     
-    # Display vulnerabilities
     display_preset_vulnerabilities(target)
     
-    # Let user select vulnerabilities to test
     selected_vulns = select_vulnerabilities(target)
     
     if not selected_vulns:
         console.print("[yellow]No vulnerabilities selected. Exiting.[/]")
         return
     
-    # For each selected vulnerability, show command and wait
     for vuln in selected_vulns:
         run_guided_test(vuln, url)
     
@@ -498,7 +490,6 @@ def display_preset_info(target: PresetTarget):
     )
     console.print(panel)
     
-    # Setup instructions
     console.print("\n[bold]Setup Instructions:[/]")
     console.print(Panel(target.setup_instructions.strip(), border_style="dim"))
 
@@ -532,7 +523,6 @@ def select_vulnerabilities(target: PresetTarget) -> List[VulnerabilityInfo]:
     console.print("\n[bold]Select vulnerabilities to test:[/]")
     console.print("[dim]Enter numbers separated by commas, 'all' for all, or 'q' to quit[/]\n")
     
-    # Number them
     idx = 1
     vuln_map = {}
     by_cat = target.get_vulnerabilities_by_category()
@@ -588,7 +578,6 @@ def run_guided_test(vuln: VulnerabilityInfo, target_url: str):
     console.print(f"  {vuln.description}")
     
     if vuln.test_command:
-        # Replace {target} placeholder
         command = vuln.test_command.replace("{target}", target_url)
         
         console.print(f"\n[bold]Suggested Test Command:[/]")
@@ -596,7 +585,6 @@ def run_guided_test(vuln: VulnerabilityInfo, target_url: str):
         
         console.print("\n[dim]You can copy and run this command in another terminal.[/]")
     
-    # Wait for user to proceed
     console.print()
     action = Prompt.ask(
         "Action",
@@ -609,7 +597,6 @@ def run_guided_test(vuln: VulnerabilityInfo, target_url: str):
     elif action == "skip":
         console.print("[yellow]Skipped[/]")
     else:
-        # If we have an ATLAS check mapped, offer to run it
         if vuln.check_id:
             if Confirm.ask(f"Run ATLAS automated check '{vuln.check_id}'?", default=True):
                 run_automated_check(vuln.check_id, target_url)

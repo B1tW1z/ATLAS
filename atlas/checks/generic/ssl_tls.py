@@ -46,51 +46,42 @@ class SSLTLSCheck(VulnerabilityCheck):
     
     async def execute(self, target: str, context: Dict[str, Any]) -> CheckResult:
         """Execute SSL/TLS check"""
-        # Parse target
         if not target.startswith("https://"):
-            # If target is not HTTPS, check if HTTPS port is open or skip
             if "https" not in target:
-                 # Logic to upgrade http to https for testing, or check if port 443 is open
-                 pass
+                target = f"https://{target.lstrip('/')}"
         
         parsed = urlparse(target)
         hostname = parsed.hostname
         port = parsed.port or 443
         
-        # Skip if not HTTPS or port 443/8443
         if parsed.scheme != "https" and port != 443:
             return self._inconclusive("Target does not appear to use HTTPS")
 
         findings = []
         
         try:
-            # 1. Get Certificate Info
             cert_info = self._get_cert_info(hostname, port)
             
             if cert_info:
-                # Check Expiry
                 days_left = (cert_info['notAfter'] - datetime.datetime.now()).days
                 if days_left < 0:
                     findings.append(f"Certificate has expired on {cert_info['notAfter']}")
                 elif days_left < 30:
                     findings.append(f"Certificate expires soon (in {days_left} days)")
                 
-                # Check Hostname
                 if not self._match_hostname(cert_info, hostname):
                      findings.append(f"Certificate common name/SAN does not match hostname '{hostname}'")
                      
-                # Check Self-Signed (heuristic: issuer == subject)
+                # Heuristic: issuer==subject usually indicates self-signed certs.
                 if cert_info.get('issuer') == cert_info.get('subject'):
                     findings.append("Certificate appears to be self-signed")
 
-            # 2. Check Protocol (Brief)
-            # Python's SSL module depends on system OpenSSL, checking specifically for SSLv3/TLS1.0 
-            # might be restricted by the client itself, but we can try to report the negotiated protocol.
+            # Python negotiates with local OpenSSL capabilities, so this reports
+            # only the negotiated protocol, not full server protocol support.
             protocol, cipher = self._get_connection_details(hostname, port)
             if protocol in ['TLSv1', 'SSLv3', 'SSLv2']:
                 findings.append(f"Weak Protocol negotiated: {protocol}")
             
-            # Result
             if findings:
                 return self._vulnerable(
                     title="Weak SSL/TLS Configuration",
@@ -116,15 +107,8 @@ class SSLTLSCheck(VulnerabilityCheck):
             with socket.create_connection((hostname, port), timeout=5) as sock:
                 with context.wrap_socket(sock, server_hostname=hostname) as ssock:
                     cert = ssock.getpeercert(binary_form=False)
-                    # Note: getpeercert() returns empty dict if verify_mode=CERT_NONE and no cert requested?
-                    # Actually for unverified, we might need to fetch it differently or just parse what we can.
-                    # Standard getpeercert() works for validated certs. For introspection we might need binary.
-                    # Let's try regular first.
                     if not cert:
-                        # try getting binary and parsing? Too complex for generic check.
-                        # Fallback: If we can't get dict, we can't check expiry easily without 3rd party lib.
-                        # But standard connect usually returns it if we ask nicely?
-                        pass
+                        return None
                     return self._parse_cert_date(cert)
         except Exception as e:
             logger.debug(f"Cert fetch error: {e}")
@@ -150,19 +134,16 @@ class SSLTLSCheck(VulnerabilityCheck):
 
     def _match_hostname(self, cert: Dict, hostname: str) -> bool:
         """Check if cert matches hostname (basic verify)"""
-        # This is complex to do right (wildcards etc). 
-        # For this basic check, we look at SANs and CN.
+        # Minimal wildcard handling for SAN/CN matching. This is intentionally
+        # narrower than RFC 6125 and may miss edge-case wildcard semantics.
         if not cert: return False
         
-        # Check SANs
         sans = cert.get('subjectAltName', [])
         for type_, value in sans:
             if type_ == 'DNS':
                 if value == hostname or (value.startswith('*.') and hostname.endswith(value[2:])):
                     return True
         
-        # Check CN (Subject)
-        # Subject is a list of tuples
         for rdn in cert.get('subject', []):
             for key, value in rdn:
                 if key == 'commonName':

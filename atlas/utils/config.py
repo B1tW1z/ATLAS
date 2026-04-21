@@ -7,7 +7,7 @@ Centralized configuration management for the ATLAS framework.
 import os
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 
 
 @dataclass
@@ -35,6 +35,25 @@ class Config:
     # Logging
     log_level: str = "INFO"
     log_file: Optional[Path] = None
+
+    # Security
+    app_base_url: str = "http://127.0.0.1:8000"
+    cors_origins: List[str] = field(default_factory=lambda: ["http://127.0.0.1:8000", "http://localhost:8000"])
+    csrf_cookie_name: str = "atlas_csrf"
+
+    # OAuth
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
+    google_redirect_uri: Optional[str] = None
+
+    microsoft_client_id: Optional[str] = None
+    microsoft_client_secret: Optional[str] = None
+    microsoft_redirect_uri: Optional[str] = None
+    microsoft_tenant: str = "common"
+
+    github_client_id: Optional[str] = None
+    github_client_secret: Optional[str] = None
+    github_redirect_uri: Optional[str] = None
     
     def __post_init__(self):
         """Ensure data directory exists"""
@@ -47,6 +66,23 @@ class Config:
             self.nmap_path = env_nmap
         if env_log := os.getenv("ATLAS_LOG_LEVEL"):
             self.log_level = env_log
+        if env_base_url := os.getenv("ATLAS_APP_BASE_URL"):
+            self.app_base_url = env_base_url
+        if env_origins := os.getenv("ATLAS_CORS_ORIGINS"):
+            self.cors_origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+
+        self.google_client_id = os.getenv("ATLAS_GOOGLE_CLIENT_ID")
+        self.google_client_secret = os.getenv("ATLAS_GOOGLE_CLIENT_SECRET")
+        self.google_redirect_uri = os.getenv("ATLAS_GOOGLE_REDIRECT_URI")
+
+        self.microsoft_client_id = os.getenv("ATLAS_MICROSOFT_CLIENT_ID")
+        self.microsoft_client_secret = os.getenv("ATLAS_MICROSOFT_CLIENT_SECRET")
+        self.microsoft_redirect_uri = os.getenv("ATLAS_MICROSOFT_REDIRECT_URI")
+        self.microsoft_tenant = os.getenv("ATLAS_MICROSOFT_TENANT", self.microsoft_tenant)
+
+        self.github_client_id = os.getenv("ATLAS_GITHUB_CLIENT_ID")
+        self.github_client_secret = os.getenv("ATLAS_GITHUB_CLIENT_SECRET")
+        self.github_redirect_uri = os.getenv("ATLAS_GITHUB_REDIRECT_URI")
 
 
 # Global config instance

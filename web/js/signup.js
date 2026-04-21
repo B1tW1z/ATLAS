@@ -5,6 +5,11 @@
  */
 
 const SignupManager = {
+    OAUTH_PROVIDERS: {
+        google: { endpoint: '/api/auth/oauth/google/start', label: 'Google' },
+        microsoft: { endpoint: '/api/auth/oauth/microsoft/start', label: 'Microsoft' },
+        github: { endpoint: '/api/auth/oauth/github/start', label: 'GitHub' }
+    },
     /**
      * Initialize signup page functionality
      */
@@ -38,26 +43,25 @@ const SignupManager = {
 
         const googleBtn = document.getElementById('google-signup-btn');
         if (googleBtn) {
-            googleBtn.addEventListener('click', () => this.handleGoogleSignup());
+            googleBtn.addEventListener('click', () => this.handleOAuthSignup('google'));
         }
 
         const microsoftBtn = document.getElementById('microsoft-signup-btn');
         if (microsoftBtn) {
-            microsoftBtn.addEventListener('click', () => this.handleMicrosoftSignup());
+            microsoftBtn.addEventListener('click', () => this.handleOAuthSignup('microsoft'));
         }
 
         const githubBtn = document.getElementById('github-signup-btn');
         if (githubBtn) {
-            githubBtn.addEventListener('click', () => this.handleGithubSignup());
+            githubBtn.addEventListener('click', () => this.handleOAuthSignup('github'));
         }
 
-        // Terms and conditions scroll detection
+        // Terms checkbox stays locked until the user reaches the bottom.
         const termsContainer = document.getElementById('terms-container');
         if (termsContainer) {
             termsContainer.addEventListener('scroll', () => this.handleTermsScroll());
         }
 
-        // Terms checkbox change - update button state
         const termsCheckbox = document.getElementById('terms-accept');
         if (termsCheckbox) {
             termsCheckbox.addEventListener('change', () => this.updateSubmitButton());
@@ -74,7 +78,6 @@ const SignupManager = {
 
         if (!termsContainer || !termsCheckbox) return;
 
-        // Check if scrolled near the bottom (within 10px)
         const isAtBottom = termsContainer.scrollHeight - termsContainer.scrollTop <= termsContainer.clientHeight + 10;
 
         if (isAtBottom) {
@@ -104,7 +107,11 @@ const SignupManager = {
         const passwordInput = document.getElementById('password');
         const eyeIcon = document.getElementById('eye-icon');
 
-        if (!passwordInput || !eyeIcon) return;
+        if (!passwordInput) return;
+        if (!eyeIcon) {
+            passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+            return;
+        }
 
         if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
@@ -159,7 +166,6 @@ const SignupManager = {
             strengthDiv.innerHTML = `<span class="strength-bar"></span><span class="strength-text">${feedback}</span>`;
         }
 
-        // Also check password match if confirm field has value
         this.checkPasswordMatch();
     },
 
@@ -203,7 +209,6 @@ const SignupManager = {
         const userType = document.getElementById('user-type').value;
         const termsAccepted = document.getElementById('terms-accept').checked;
 
-        // Client-side validation
         if (password !== confirmPassword) {
             this.showError(errorDiv, 'Passwords do not match');
             return;
@@ -224,7 +229,6 @@ const SignupManager = {
             return;
         }
 
-        // Disable button
         signupBtn.disabled = true;
         signupBtn.textContent = 'Creating account...';
         errorDiv.classList.remove('show');
@@ -243,19 +247,16 @@ const SignupManager = {
 
             if (response.ok) {
                 this.showSuccess(successDiv, 'Account created successfully! Redirecting...');
-                // Store token if provided
-                if (data.token) {
-                    localStorage.setItem('atlas_token', data.token);
-                }
-                if (data.user) {
-                    localStorage.setItem('atlas_user', JSON.stringify(data.user));
-                }
-                // Redirect to dashboard after short delay
+                this.persistSession(data);
                 setTimeout(() => {
                     window.location.href = '/dashboard';
                 }, 1500);
             } else {
-                this.showError(errorDiv, data.detail || 'Signup failed. Please try again.');
+                if (response.status === 429) {
+                    this.showError(errorDiv, data.detail || 'Too many signup attempts. Please try again later.');
+                } else {
+                    this.showError(errorDiv, data.detail || 'Signup failed. Please try again.');
+                }
             }
         } catch (error) {
             console.error('Signup error:', error);
@@ -266,63 +267,27 @@ const SignupManager = {
         }
     },
 
-    /**
-     * Handle Google signup
-     */
-    async handleGoogleSignup() {
-        const errorDiv = document.getElementById('signup-error');
-        const successDiv = document.getElementById('signup-success');
-
-        // Show loading modal for demo
-        this.showLoadingModal('Connecting to Google...', 'google');
-
-        // Pause for demo/presentation (2 seconds)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        try {
-            this.updateLoadingModal('Authenticating with Google...');
-
-            const response = await fetch('/api/auth/google', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                this.updateLoadingModal('Authentication successful!');
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
-                if (data.token) {
-                    localStorage.setItem('atlas_token', data.token);
-                }
-                if (data.user) {
-                    localStorage.setItem('atlas_user', JSON.stringify(data.user));
-                }
-
-                this.hideLoadingModal();
-                this.showSuccess(successDiv, 'Google sign-in successful! Redirecting...');
-                setTimeout(() => {
-                    window.location.href = '/dashboard';
-                }, 1000);
-            } else {
-                this.hideLoadingModal();
-                this.showError(errorDiv, data.detail || 'Google sign-up failed');
-            }
-        } catch (error) {
-            this.hideLoadingModal();
-            console.error('Google signup error:', error);
-            this.showError(errorDiv, 'Google sign-up is not configured yet');
+    persistSession(data) {
+        if (data.token) {
+            localStorage.setItem('atlas_token', data.token);
+        }
+        if (data.user) {
+            localStorage.setItem('atlas_user', JSON.stringify(data.user));
         }
     },
 
-    /**
-     * Show loading modal
-     */
+    async handleOAuthSignup(providerKey) {
+        const provider = this.OAUTH_PROVIDERS[providerKey];
+        const errorDiv = document.getElementById('signup-error');
+
+        if (!provider) {
+            this.showError(errorDiv, 'Authentication provider is unavailable');
+            return;
+        }
+        window.location.href = provider.endpoint;
+    },
+
     showLoadingModal(message, provider) {
-        // Remove existing modal if any
         this.hideLoadingModal();
 
         const modal = document.createElement('div');
@@ -337,13 +302,9 @@ const SignupManager = {
         `;
         document.body.appendChild(modal);
 
-        // Trigger animation
         requestAnimationFrame(() => modal.classList.add('show'));
     },
 
-    /**
-     * Update loading modal message
-     */
     updateLoadingModal(message) {
         const textEl = document.querySelector('.oauth-loading-text');
         if (textEl) {
@@ -351,88 +312,11 @@ const SignupManager = {
         }
     },
 
-    /**
-     * Hide loading modal
-     */
     hideLoadingModal() {
         const modal = document.getElementById('oauth-loading-modal');
         if (modal) {
             modal.classList.remove('show');
             setTimeout(() => modal.remove(), 300);
-        }
-    },
-
-    /**
-     * Handle Microsoft signup
-     */
-    async handleMicrosoftSignup() {
-        const errorDiv = document.getElementById('signup-error');
-        const successDiv = document.getElementById('signup-success');
-
-        try {
-            const response = await fetch('/api/auth/microsoft', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                if (data.token) {
-                    localStorage.setItem('atlas_token', data.token);
-                }
-                if (data.user) {
-                    localStorage.setItem('atlas_user', JSON.stringify(data.user));
-                }
-                this.showSuccess(successDiv, 'Microsoft sign-in successful! Redirecting...');
-                setTimeout(() => {
-                    window.location.href = '/dashboard';
-                }, 1000);
-            } else {
-                this.showError(errorDiv, data.detail || 'Microsoft sign-up failed');
-            }
-        } catch (error) {
-            console.error('Microsoft signup error:', error);
-            this.showError(errorDiv, 'Microsoft sign-up is not configured yet');
-        }
-    },
-
-    /**
-     * Handle GitHub signup
-     */
-    async handleGithubSignup() {
-        const errorDiv = document.getElementById('signup-error');
-        const successDiv = document.getElementById('signup-success');
-
-        try {
-            const response = await fetch('/api/auth/github', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                if (data.token) {
-                    localStorage.setItem('atlas_token', data.token);
-                }
-                if (data.user) {
-                    localStorage.setItem('atlas_user', JSON.stringify(data.user));
-                }
-                this.showSuccess(successDiv, 'GitHub sign-in successful! Redirecting...');
-                setTimeout(() => {
-                    window.location.href = '/dashboard';
-                }, 1000);
-            } else {
-                this.showError(errorDiv, data.detail || 'GitHub sign-up failed');
-            }
-        } catch (error) {
-            console.error('GitHub signup error:', error);
-            this.showError(errorDiv, 'GitHub sign-up is not configured yet');
         }
     },
 

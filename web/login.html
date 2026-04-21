@@ -485,6 +485,27 @@
             color: #00d4ff;
         }
 
+        .security-badges {
+            margin-top: 18px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid #1e293b;
+            background: rgba(2, 6, 23, 0.75);
+            color: #93c5fd;
+            font-size: 0.72rem;
+            letter-spacing: 0.03em;
+        }
+
         @media (max-width: 480px) {
             .login-card {
                 padding: 24px;
@@ -614,6 +635,11 @@
 
                 <div class="login-footer">
                     <p>Don't have an account? <a href="/signup">Sign Up</a></p>
+                    <div class="security-badges">
+                        <span class="security-badge"><i class="fa-solid fa-shield-halved"></i> OWASP Aligned</span>
+                        <span class="security-badge"><i class="fa-solid fa-lock"></i> Secure Session</span>
+                        <span class="security-badge"><i class="fa-solid fa-gauge-high"></i> Rate Limited</span>
+                    </div>
                 </div>
             </div>
         </div>

@@ -16,6 +16,7 @@ let allScans = [];
 // ========== Initialization ==========
 
 document.addEventListener('DOMContentLoaded', async () => {
+    await initCsrfToken();
     // Check authentication first
     const isAuthenticated = await checkAuthentication();
 
@@ -117,8 +118,6 @@ function showPage(pageName) {
         loadAllChecks();
     } else if (pageName === 'new-scan') {
         resetScanWizard();
-    } else if (pageName === 'demo') {
-        loadDemoTargets();
     } else if (pageName === 'reports') {
         loadReports();
     } else if (pageName === 'profile') {
@@ -133,7 +132,7 @@ function showPage(pageName) {
     // Update header breadcrumb
     const pageLabels = {
         dashboard: 'Dashboard', 'new-scan': 'New Scan', checks: 'Vulnerability Checks',
-        demo: 'Demo Targets', reports: 'Reports', activity: 'Activity Log',
+        reports: 'Reports', activity: 'Activity Log',
         scheduling: 'Scheduled Scans', terminal: 'Terminal', profile: 'Profile', settings: 'Settings'
     };
     const bc = document.getElementById('header-breadcrumb');
@@ -146,11 +145,14 @@ function showPage(pageName) {
 
 async function apiRequest(endpoint, options = {}) {
     try {
+        const csrfToken = localStorage.getItem('atlas_csrf_token') || getCookieValue('atlas_csrf');
         const response = await fetch(`${API_BASE}${endpoint}`, {
             headers: {
                 'Content-Type': 'application/json',
+                ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
                 ...options.headers
             },
+            credentials: 'include',
             ...options
         });
 
@@ -163,6 +165,26 @@ async function apiRequest(endpoint, options = {}) {
     } catch (error) {
         console.error('API Error:', error);
         throw error;
+    }
+}
+
+function getCookieValue(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+}
+
+async function initCsrfToken() {
+    try {
+        const response = await fetch('/api/auth/csrf', { credentials: 'include' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data?.csrf_token) {
+            localStorage.setItem('atlas_csrf_token', data.csrf_token);
+        }
+    } catch (error) {
+        console.debug('Failed to initialize CSRF token', error);
     }
 }
 
@@ -452,19 +474,18 @@ async function runReconnaissance() {
     try {
         statusText.textContent = 'Scanning ports and services...';
 
-        // Fire-and-forget: kick off recon in background
+        // Non-blocking trigger; progress is tracked through polling.
         fetch(`${API_BASE}/scans/${currentScanId}/recon`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         }).catch(() => { });
 
-        // Poll scan status until recon completes (120s timeout)
         const results = await pollScanPhase('SELECTION', statusText, [
             'Scanning ports and services...',
             'Enumerating service versions...',
             'Fingerprinting target...',
             'Analyzing discovered services...'
-        ], 90); // 90 attempts × 2s = 180s timeout
+        ], 90);
 
         clearInterval(progressInterval);
         progressFill.style.width = '100%';
@@ -491,7 +512,6 @@ async function runReconnaissance() {
         clearInterval(progressInterval);
 
         if (error.message.includes('scan_error')) {
-            // Backend reported an actual error during recon
             progressFill.style.width = '100%';
             progressFill.style.background = 'var(--severity-critical, #ff4757)';
             statusText.innerHTML = `
@@ -707,7 +727,7 @@ async function executeChecks() {
 
         addLogEntry('Checks selected, starting execution...', 'info');
 
-        // Fire-and-forget: kick off execution in background
+        // Non-blocking trigger; completion is tracked through polling.
         fetch(`${API_BASE}/scans/${currentScanId}/execute`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
@@ -718,7 +738,7 @@ async function executeChecks() {
         let lastCompleted = 0;
         const checkNames = Array.from(selectedChecks);
 
-        const maxPollAttempts = 30; // 30 * 2s = 60s max
+        const maxPollAttempts = 30;
         let pollAttempt = 0;
 
         while (pollAttempt < maxPollAttempts) {
@@ -760,7 +780,8 @@ async function executeChecks() {
                         const report = await apiRequest(`/reports/${currentScanId}/findings`);
                         findings = report.findings || [];
                     } catch (e) {
-                        // Fallback: findings_count from progress
+                        // Bugfix guard: findings endpoint may lag right after a
+                        // phase transition, so use progress counts as fallback.
                         addLogEntry(`Completed with ${progress.findings_count || 0} findings`, 'info');
                     }
 
@@ -866,11 +887,10 @@ async function downloadReport() {
 
 async function loadReports() {
     try {
-        // Fetch reports list (we'll use the scans list effectively for now as reports correspond to scans)
-        const { scans } = await apiRequest('/scans?limit=50');
+        const reports = await apiRequest('/reports');
         const container = document.querySelector('#page-reports .card');
 
-        if (scans.length === 0) {
+        if (reports.length === 0) {
             container.innerHTML = '<p class="empty-state">No scans found.</p>';
             return;
         }
@@ -888,15 +908,15 @@ async function loadReports() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${scans.map(scan => `
+                        ${reports.map(report => `
                             <tr>
-                                <td><code>${scan.id}</code></td>
-                                <td>${truncate(scan.target, 50)}</td>
-                                <td>${formatDate(scan.created_at)}</td>
-                                <td><span class="status-${scan.status}">${scan.status}</span></td>
+                                <td><code>${report.scan_id}</code></td>
+                                <td>${truncate(report.scan_id, 50)}</td>
+                                <td>${new Date(report.created_at * 1000).toLocaleString()}</td>
+                                <td><span class="status-completed">${report.format}</span></td>
                                 <td>
-                                    <button class="btn btn-sm" onclick="downloadReportId('${scan.id}')">Download</button>
-                                    <button class="btn btn-sm btn-secondary delete-btn" data-role="admin" style="color: var(--severity-critical); border-color: var(--severity-critical);" onclick="deleteReport('${scan.id}')">Delete</button>
+                                    <button class="btn btn-sm" onclick="downloadReportId('${report.scan_id}')">Download</button>
+                                    <button class="btn btn-sm btn-secondary delete-btn" data-role="admin" style="color: var(--severity-critical); border-color: var(--severity-critical);" onclick="deleteReport('${report.scan_id}')">Delete</button>
                                 </td>
                             </tr>
                         `).join('')}
@@ -979,339 +999,6 @@ async function loadAllChecks() {
     }
 }
 
-// ========== Demo Targets Page ==========
-
-async function loadDemoTargets() {
-    try {
-        const data = await apiRequest('/presets');
-
-        const container = document.getElementById('presets-grid');
-
-        container.innerHTML = data.presets.map(preset => `
-            <div class="preset-card">
-                <div class="preset-header">
-                    <div class="preset-title">${preset.name}</div>
-                    <span class="preset-category">${preset.category}</span>
-                </div>
-                
-                <p class="preset-description">${preset.description}</p>
-                
-                <div class="preset-stats">
-                    <div class="stat">
-                        <strong>${preset.vulnerability_count}</strong> Vulnerabilities
-                    </div>
-                </div>
-                
-                <div class="preset-tags">
-                    ${preset.tags.map(tag => `<span class="preset-tag">${tag}</span>`).join('')}
-                </div>
-                
-                <div style="margin-top: auto; display: flex; gap: 12px;">
-                    <a href="${preset.github_url}" target="_blank" class="btn btn-sm btn-secondary">
-                        GitHub
-                    </a>
-                    <button class="btn btn-sm btn-primary" style="flex: 1;" onclick="startPresetScan('${preset.id}', '${preset.default_url}')">
-                        Launch Demo
-                    </button>
-                </div>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        console.error('Failed to load presets:', error);
-    }
-}
-
-async function startPresetScan(presetId, defaultUrl) {
-    // Presets with interactive simulations
-    const simulatablePresets = ['iotgoat', 'vulnbank'];
-    if (simulatablePresets.includes(presetId)) {
-        await launchPresetSimulation(presetId);
-        return;
-    }
-
-    // Other presets: original behavior
-    const url = prompt(`Enter target URL for ${presetId}:`, defaultUrl);
-    if (!url) return;
-
-    showPage('new-scan');
-    document.getElementById('target-input').value = url;
-
-    // Auto-start
-    await startScan();
-}
-
-
-// ========== IoTGoat Demo Simulation ==========
-
-let simData = null;
-let simCurrentStep = -1;
-let simCompletedSteps = new Set();
-let simIsAnimating = false;
-
-const PRESET_SIM_META = {
-    iotgoat: {
-        label: 'OWASP IoTGoat',
-        ip: '192.168.1.1',
-        termTitle: 'iotgoatuser@IoTGoat:~',
-        icon: '📡'
-    },
-    vulnbank: {
-        label: 'VulnBank',
-        ip: '127.0.0.1:5000',
-        termTitle: 'pentester@kali:~/vulnbank',
-        icon: '🏦'
-    }
-};
-
-async function launchPresetSimulation(presetId) {
-    const meta = PRESET_SIM_META[presetId] || { label: presetId, ip: 'localhost', termTitle: 'user@host:~', icon: '🔍' };
-    showLoading(`Initializing ${meta.label} simulation...`);
-    try {
-        simData = await apiRequest(`/presets/${presetId}/simulate`, { method: 'POST' });
-        simCurrentStep = -1;
-        simCompletedSteps = new Set();
-        simIsAnimating = false;
-
-        showPage('iotgoat-demo');
-        hideLoading();
-
-        // Update page header dynamically
-        const titleEl = document.querySelector('#page-iotgoat-demo .page-header h2');
-        if (titleEl) titleEl.textContent = `${meta.label} — Live Simulation`;
-        const deviceName = document.querySelector('.sim-device-name');
-        if (deviceName) deviceName.textContent = meta.label;
-        const ipBadge = document.querySelector('.sim-ip-badge');
-        if (ipBadge) ipBadge.textContent = meta.ip;
-        const termTitle = document.querySelector('.sim-terminal-title');
-        if (termTitle) termTitle.textContent = meta.termTitle;
-
-        renderSimStepList();
-        updateSimProgress();
-
-        // Auto-start first step
-        runSimulationStep(0);
-    } catch (error) {
-        hideLoading();
-        showToast(`Failed to load ${meta.label} simulation: ` + error.message, 'error');
-    }
-}
-
-function renderSimStepList() {
-    const list = document.getElementById('sim-step-list');
-    list.innerHTML = simData.steps.map((step, idx) => `
-        <div class="sim-step-item ${idx === simCurrentStep ? 'active' : ''} ${simCompletedSteps.has(idx) ? 'completed' : ''}"
-             data-step="${idx}" onclick="runSimulationStep(${idx})">
-            <div class="sim-step-item-num">${String(step.id).padStart(2, '0')}</div>
-            <div class="sim-step-item-info">
-                <div class="sim-step-item-title">${step.title}</div>
-                <div class="sim-step-item-cat">${step.owasp_category}</div>
-            </div>
-            <div class="sim-step-item-status">
-                ${simCompletedSteps.has(idx) ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#00ff88" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
-            </div>
-        </div>
-    `).join('');
-}
-
-function updateSimProgress() {
-    const done = simCompletedSteps.size;
-    const total = simData.steps.length;
-    document.getElementById('sim-steps-done').textContent = done;
-    document.getElementById('sim-steps-total').textContent = total;
-    document.getElementById('sim-progress-fill').style.width = `${(done / total) * 100}%`;
-
-    // Show complete button if all done
-    const completeBtn = document.getElementById('sim-complete-btn');
-    if (done === total) {
-        completeBtn.style.display = 'block';
-    }
-}
-
-async function runSimulationStep(stepIndex) {
-    if (simIsAnimating) return;
-    if (stepIndex < 0 || stepIndex >= simData.steps.length) return;
-
-    simCurrentStep = stepIndex;
-    const step = simData.steps[stepIndex];
-
-    // Update step header
-    document.getElementById('sim-step-number').textContent = String(step.id).padStart(2, '0');
-    document.getElementById('sim-step-title').textContent = step.title;
-    document.getElementById('sim-owasp-badge').textContent = step.owasp_category;
-    document.getElementById('sim-step-desc').textContent = step.description;
-
-    // Hide findings and nav for now
-    document.getElementById('sim-findings-panel').style.display = 'none';
-    document.getElementById('sim-step-nav').style.display = 'none';
-
-    // Highlight active step in navigator
-    renderSimStepList();
-
-    // Clear terminal
-    const termBody = document.getElementById('sim-terminal-body');
-    termBody.innerHTML = '';
-
-    // Animate terminal commands
-    simIsAnimating = true;
-
-    for (const cmd of step.commands) {
-        await animateTerminalCommand(termBody, cmd.prompt, cmd.output, cmd.delay || 1000);
-    }
-
-    simIsAnimating = false;
-
-    // Mark step as completed
-    simCompletedSteps.add(stepIndex);
-    updateSimProgress();
-    renderSimStepList();
-
-    // Show findings
-    showSimFindings(step.findings);
-
-    // Show navigation
-    const navDiv = document.getElementById('sim-step-nav');
-    navDiv.style.display = 'flex';
-    document.getElementById('sim-prev-btn').disabled = stepIndex === 0;
-    document.getElementById('sim-next-btn').textContent =
-        stepIndex === simData.steps.length - 1 ? 'View Summary ✓' : 'Next Challenge →';
-}
-
-function animateTerminalCommand(container, prompt, output, delay) {
-    return new Promise(resolve => {
-        // Remove old cursor
-        const oldCursor = container.querySelector('.sim-terminal-cursor');
-        if (oldCursor) oldCursor.remove();
-
-        // Add prompt line with typing effect
-        const promptLine = document.createElement('div');
-        promptLine.className = 'sim-terminal-line prompt';
-        container.appendChild(promptLine);
-
-        // Type out the prompt
-        let promptText = prompt;
-        let charIdx = 0;
-        const typeSpeed = 15;
-
-        const typeInterval = setInterval(() => {
-            if (charIdx < promptText.length) {
-                promptLine.textContent = promptText.substring(0, charIdx + 1);
-                charIdx++;
-                container.scrollTop = container.scrollHeight;
-            } else {
-                clearInterval(typeInterval);
-
-                // After prompt finishes, show "processing" pause then output
-                setTimeout(() => {
-                    // Add output lines
-                    const lines = output.split('\n');
-                    lines.forEach(line => {
-                        const outputLine = document.createElement('div');
-                        outputLine.className = 'sim-terminal-line output';
-                        // Highlight warnings/alerts in red
-                        if (line.includes('[!]') || line.includes('FOUND') || line.includes('SUCCESS') || line.includes('succeeded')) {
-                            outputLine.className += ' highlight';
-                        }
-                        outputLine.textContent = line;
-                        container.appendChild(outputLine);
-                    });
-
-                    // Add blank line separator
-                    const spacer = document.createElement('div');
-                    spacer.className = 'sim-terminal-line';
-                    spacer.innerHTML = '&nbsp;';
-                    container.appendChild(spacer);
-
-                    // Add cursor
-                    const cursor = document.createElement('div');
-                    cursor.className = 'sim-terminal-cursor';
-                    cursor.textContent = '█';
-                    container.appendChild(cursor);
-
-                    container.scrollTop = container.scrollHeight;
-                    resolve();
-                }, delay);
-            }
-        }, typeSpeed);
-    });
-}
-
-function showSimFindings(findings) {
-    const panel = document.getElementById('sim-findings-panel');
-    const list = document.getElementById('sim-findings-list');
-
-    list.innerHTML = findings.map(f => `
-        <div class="sim-finding-card severity-${f.severity}">
-            <div class="sim-finding-header">
-                <span class="sim-finding-title">${escapeHtml(f.title)}</span>
-                <span class="severity-badge severity-${f.severity}">${f.severity}</span>
-            </div>
-            <p class="sim-finding-desc">${escapeHtml(f.description)}</p>
-            <div class="sim-finding-details">
-                <div class="sim-finding-section">
-                    <strong>Evidence</strong>
-                    <pre>${escapeHtml(f.evidence)}</pre>
-                </div>
-                <div class="sim-finding-section">
-                    <strong>Remediation</strong>
-                    <p>${escapeHtml(f.remediation)}</p>
-                </div>
-                <div class="sim-finding-meta">
-                    <span class="sim-meta-badge">${f.cwe}</span>
-                    <span class="sim-meta-badge">OWASP IoT ${f.owasp_iot}</span>
-                </div>
-            </div>
-        </div>
-    `).join('');
-
-    panel.style.display = 'block';
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function navigateSimStep(direction) {
-    const nextIndex = simCurrentStep + direction;
-    if (nextIndex < 0) return;
-
-    if (nextIndex >= simData.steps.length) {
-        showSimulationSummary();
-        return;
-    }
-    runSimulationStep(nextIndex);
-}
-
-function showSimulationSummary() {
-    // Collect all findings
-    const allFindings = [];
-    simData.steps.forEach(step => {
-        step.findings.forEach(f => allFindings.push(f));
-    });
-
-    const counts = { critical: 0, high: 0, medium: 0 };
-    allFindings.forEach(f => {
-        if (counts[f.severity] !== undefined) counts[f.severity]++;
-    });
-
-    document.getElementById('sim-sum-critical').textContent = counts.critical;
-    document.getElementById('sim-sum-high').textContent = counts.high;
-    document.getElementById('sim-sum-medium').textContent = counts.medium;
-
-    // Render all findings
-    const container = document.getElementById('sim-summary-findings');
-    container.innerHTML = allFindings.map(f => `
-        <div class="sim-summary-finding-item">
-            <span class="severity-badge severity-${f.severity}">${f.severity}</span>
-            <span>${escapeHtml(f.title)}</span>
-            <span class="sim-meta-badge">${f.cwe}</span>
-        </div>
-    `).join('');
-
-    document.getElementById('sim-summary-overlay').style.display = 'flex';
-}
-
-function closeSimulationSummary() {
-    document.getElementById('sim-summary-overlay').style.display = 'none';
-}
-
 // ========== Utilities ==========
 
 function showLoading(text = 'Loading...') {
@@ -1329,13 +1016,14 @@ function truncate(str, len) {
 
 function formatDate(dateStr) {
     if (!dateStr) return '—';
-    // Backend sends UTC isoformat without 'Z' — append it so JS treats as UTC
+    // Bugfix: backend may omit timezone suffix; force UTC parsing to prevent
+    // local-time shifts in displayed timestamps.
     let s = String(dateStr);
     if (!s.endsWith('Z') && !s.includes('+') && !s.includes('-', 10)) {
         s += 'Z';
     }
     const d = new Date(s);
-    if (isNaN(d)) return dateStr; // fallback if unparseable
+    if (isNaN(d)) return dateStr;
     return d.toLocaleString('en-IN', {
         day: '2-digit',
         month: 'short',
@@ -1462,11 +1150,6 @@ async function checkAuthentication() {
         console.error('Auth verify failed:', error);
     }
 
-    // If we have a stored user, allow access (for demo purposes)
-    if (currentUser) {
-        return true;
-    }
-
     // No authentication, return false
     return false;
 }
@@ -1552,7 +1235,8 @@ async function handleLogout() {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('atlas_token') || ''}`
-            }
+            },
+            credentials: 'include'
         });
     } catch (error) {
         console.error('Logout error:', error);
@@ -1560,6 +1244,7 @@ async function handleLogout() {
 
     // Clear local storage
     localStorage.removeItem('atlas_token');
+    localStorage.removeItem('atlas_csrf_token');
     localStorage.removeItem('atlas_user');
 
     // Redirect to login
