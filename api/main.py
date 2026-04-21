@@ -132,7 +132,7 @@ async def security_headers_middleware(request: Request, call_next):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data: https:; "
-        "connect-src 'self' ws: wss: https:; "
+        "connect-src 'self' ws: wss: http: https:; "
         "frame-ancestors 'none'; "
         "base-uri 'self'; "
         "form-action 'self'"

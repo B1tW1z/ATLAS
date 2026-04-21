@@ -25,8 +25,8 @@ class Config:
     
     # Nmap Settings
     nmap_path: Optional[str] = None  # Auto-detect if None
-    nmap_default_args: str = "-sV -T4 --top-ports 100"
-    nmap_timeout: int = 300  # 5 minutes
+    nmap_default_args: str = "-T5 --max-retries 2 --top-ports 50"
+    nmap_timeout: int = 60  # 1 minute max
     
     # Web UI Settings
     api_host: str = "127.0.0.1"

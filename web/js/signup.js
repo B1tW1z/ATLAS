@@ -183,10 +183,10 @@ const SignupManager = {
             matchDiv.textContent = '';
             matchDiv.className = 'input-hint password-match';
         } else if (password === confirmPassword) {
-            matchDiv.textContent = '✓ Passwords match';
+            matchDiv.innerHTML = '<i class="fas fa-check"></i> Passwords match';
             matchDiv.className = 'input-hint password-match match';
         } else {
-            matchDiv.textContent = '✗ Passwords do not match';
+            matchDiv.innerHTML = '<i class="fas fa-times"></i> Passwords do not match';
             matchDiv.className = 'input-hint password-match no-match';
         }
     },
@@ -214,8 +214,8 @@ const SignupManager = {
             return;
         }
 
-        if (password.length < 8) {
-            this.showError(errorDiv, 'Password must be at least 8 characters');
+        if (password.length < 12) {
+            this.showError(errorDiv, 'Password must be at least 12 characters');
             return;
         }
 
@@ -252,10 +252,11 @@ const SignupManager = {
                     window.location.href = '/dashboard';
                 }, 1500);
             } else {
+                const msg = this.extractErrorMessage(data);
                 if (response.status === 429) {
-                    this.showError(errorDiv, data.detail || 'Too many signup attempts. Please try again later.');
+                    this.showError(errorDiv, msg || 'Too many signup attempts. Please try again later.');
                 } else {
-                    this.showError(errorDiv, data.detail || 'Signup failed. Please try again.');
+                    this.showError(errorDiv, msg || 'Signup failed. Please try again.');
                 }
             }
         } catch (error) {
@@ -274,6 +275,16 @@ const SignupManager = {
         if (data.user) {
             localStorage.setItem('atlas_user', JSON.stringify(data.user));
         }
+    },
+
+    extractErrorMessage(data) {
+        if (!data) return null;
+        if (typeof data.detail === 'string') return data.detail;
+        if (Array.isArray(data.detail) && data.detail.length > 0) {
+            return data.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+        }
+        if (data.message) return data.message;
+        return JSON.stringify(data);
     },
 
     async handleOAuthSignup(providerKey) {

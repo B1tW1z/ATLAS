@@ -69,6 +69,16 @@ const LoginManager = {
         }
     },
 
+    extractErrorMessage(data) {
+        if (!data) return null;
+        if (typeof data.detail === 'string') return data.detail;
+        if (Array.isArray(data.detail) && data.detail.length > 0) {
+            return data.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+        }
+        if (data.message) return data.message;
+        return JSON.stringify(data);
+    },
+
     /**
      * Toggle password visibility
      */
@@ -125,12 +135,13 @@ const LoginManager = {
 
             if (response.ok) {
                 this.persistSession(data);
-                window.location.href = '/dashboard';
+                window.location.href = '/loading?redirect=/dashboard';
             } else {
+                const msg = this.extractErrorMessage(data);
                 if (response.status === 429) {
-                    this.showError(errorDiv, data.detail || 'Too many login attempts. Please try again later.');
+                    this.showError(errorDiv, msg || 'Too many login attempts. Please try again later.');
                 } else {
-                    this.showError(errorDiv, data.detail || 'Invalid username or password');
+                    this.showError(errorDiv, msg || 'Invalid username or password');
                 }
             }
         } catch (error) {

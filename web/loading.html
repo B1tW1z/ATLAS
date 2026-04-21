@@ -10,6 +10,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Orbitron:wght@500;600;700;800&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {
             margin: 0;
@@ -303,12 +304,21 @@
         <p class="loading-text">Preparing your security assessment environment</p>
 
         <div class="security-tip">
-            <div class="tip-label">💡 Security Tip</div>
+            <div class="tip-label"><i class="fas fa-lightbulb"></i> Security Tip</div>
             <p class="tip-text" id="tip-text">Always validate and sanitize user inputs to prevent injection attacks.</p>
         </div>
     </div>
 
     <script>
+        // Get redirect URL from query parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectUrl = urlParams.get('redirect') || '/dashboard';
+
+        // Auto-redirect after 1.5 seconds (enough to see the animation)
+        setTimeout(() => {
+            window.location.href = redirectUrl;
+        }, 1500);
+
         const tips = [
             "Always validate and sanitize user inputs to prevent injection attacks.",
             "Use HTTPS to encrypt data in transit between clients and servers.",

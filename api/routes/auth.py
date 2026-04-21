@@ -68,15 +68,11 @@ def _client_ip(request: Request) -> str:
 
 
 def _record_auth_event(event_type: str, message: str) -> None:
-    """Persist auth events to activity log and structured logger."""
+    """Log auth events to server log file only (not site activity feed)."""
     logger.info("auth_event type=%s message=%s", event_type, message)
-    try:
-        get_db().add_scan_event(None, event_type, message)
-    except Exception as exc:
-        logger.warning("Unable to persist auth event: %s", exc)
 
 
-def _set_auth_cookies(response: Response, session_token: str, remember: bool = False) -> str:
+def _set_auth_cookies(response: Response, session_token: str, remember: bool = False, secure: bool = True) -> str:
     csrf_token = create_csrf_token()
     max_age = 30 * 24 * 60 * 60 if remember else 24 * 60 * 60
     response.set_cookie(
@@ -85,7 +81,7 @@ def _set_auth_cookies(response: Response, session_token: str, remember: bool = F
         httponly=True,
         max_age=max_age,
         samesite="lax",
-        secure=True
+        secure=secure
     )
     response.set_cookie(
         key=get_config().csrf_cookie_name,
@@ -93,7 +89,7 @@ def _set_auth_cookies(response: Response, session_token: str, remember: bool = F
         httponly=False,
         max_age=max_age,
         samesite="lax",
-        secure=True
+        secure=secure
     )
     return csrf_token
 
@@ -296,7 +292,7 @@ async def login(request: Request, credentials: LoginRequest, response: Response)
     # Create session
     token = create_session(username, credentials.remember)
     
-    csrf_token = _set_auth_cookies(response, token, remember=credentials.remember)
+    csrf_token = _set_auth_cookies(response, token, remember=credentials.remember, secure=request.url.scheme == "https")
     _record_auth_event("auth_login_success", f"username={username} ip={_client_ip(request)}")
     
     return LoginResponse(
@@ -424,7 +420,7 @@ async def signup(request: Request, signup_data: SignupRequest, response: Respons
     # Automatically log in the new user
     token = create_session(username, remember=False)
     
-    csrf_token = _set_auth_cookies(response, token, remember=False)
+    csrf_token = _set_auth_cookies(response, token, remember=False, secure=request.url.scheme == "https")
     _record_auth_event("auth_signup_success", f"username={username} ip={_client_ip(request)}")
     
     return LoginResponse(
@@ -550,7 +546,7 @@ async def oauth_callback(provider: str, request: Request, code: str, state: str)
     user = _upsert_oauth_user(get_db(), email=email, name=name, preferred_username=preferred_username, role="user")
     token = create_session(user.username, remember=False)
     response = RedirectResponse(url="/dashboard", status_code=302)
-    _set_auth_cookies(response, token, remember=False)
+    _set_auth_cookies(response, token, remember=False, secure=request.url.scheme == "https")
     _record_auth_event("auth_oauth_success", f"provider={provider} username={user.username} ip={_client_ip(request)}")
     return response
 
@@ -564,7 +560,7 @@ async def get_csrf(request: Request, response: Response):
         httponly=False,
         max_age=24 * 60 * 60,
         samesite="lax",
-        secure=True,
+        secure=request.url.scheme == "https",
     )
     return {"csrf_token": token}
 

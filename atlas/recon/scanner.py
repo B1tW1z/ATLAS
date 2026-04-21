@@ -65,7 +65,7 @@ class ReconScanner:
             return await self._fallback_scan(host, parsed)
     
     async def _nmap_scan(self, host: str) -> Dict[str, Any]:
-        """Execute Nmap scan"""
+        """Execute Nmap scan with timeout to prevent hanging"""
         try:
             import nmap
             
@@ -77,10 +77,15 @@ class ReconScanner:
             def run_scan():
                 return nm.scan(
                     hosts=host,
-                    arguments=self._config.nmap_default_args
+                    arguments=self._config.nmap_default_args,
+                    timeout=self._config.nmap_timeout
                 )
             
-            await loop.run_in_executor(None, run_scan)
+            # Use wait_for to enforce timeout
+            await asyncio.wait_for(
+                loop.run_in_executor(None, run_scan),
+                timeout=self._config.nmap_timeout
+            )
             
             # Parse results
             results = {
@@ -122,6 +127,9 @@ class ReconScanner:
             
         except ImportError:
             logger.error("python-nmap not installed")
+            return await self._fallback_scan(host, urlparse(f"http://{host}"))
+        except asyncio.TimeoutError:
+            logger.warning(f"Nmap scan timed out after {self._config.nmap_timeout}s, using fallback")
             return await self._fallback_scan(host, urlparse(f"http://{host}"))
         except Exception as e:
             logger.error(f"Nmap scan failed: {e}")

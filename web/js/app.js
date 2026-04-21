@@ -360,9 +360,18 @@ async function loadDashboard() {
             animateCounter(document.getElementById('stat-high'), sev.high || 0);
             animateCounter(document.getElementById('stat-medium'), sev.medium || 0);
             renderDonutChart(sev);
+
+            // Update Risk Score
+            updateRiskScore(sev);
         } catch (e) {
             console.warn('Dashboard stats unavailable:', e);
         }
+
+        // Load recent findings
+        await loadRecentFindings();
+
+        // Update activity feed
+        addDashboardActivity('Dashboard refreshed', 'info');
 
         const { scans } = await apiRequest('/scans?limit=10');
         allScans = scans;
@@ -372,7 +381,7 @@ async function loadDashboard() {
                 <tr>
                     <td colspan="6">
                         <div class="empty-state-enhanced">
-                            <div class="empty-state-icon">🔍</div>
+                            <div class="empty-state-icon"><i class="fas fa-search"></i></div>
                             <h4>No scans yet</h4>
                             <p>Launch your first vulnerability assessment to see results here.</p>
                             <button class="btn btn-primary btn-sm" onclick="showPage('new-scan')">+ Start First Scan</button>
@@ -388,6 +397,135 @@ async function loadDashboard() {
     } catch (error) {
         console.error('Failed to load dashboard:', error);
     }
+}
+
+// ========== Dashboard Widgets ==========
+
+function updateRiskScore(severity) {
+    const critical = severity.critical || 0;
+    const high = severity.high || 0;
+    const medium = severity.medium || 0;
+    const low = severity.low || 0;
+    const info = severity.info || 0;
+
+    // Calculate weighted risk score (0-100)
+    const total = critical + high + medium + low + info;
+    if (total === 0) {
+        document.getElementById('risk-score').textContent = '--';
+        document.getElementById('risk-label').textContent = 'No Data';
+        document.getElementById('risk-critical').textContent = '0 Critical';
+        document.getElementById('risk-high').textContent = '0 High';
+        return;
+    }
+
+    // Weight: Critical=10, High=5, Medium=2, Low=1, Info=0
+    const score = Math.min(100, Math.round(
+        (critical * 10 + high * 5 + medium * 2 + low * 1) / Math.max(total, 1) * 10
+    ));
+
+    const scoreEl = document.getElementById('risk-score');
+    scoreEl.textContent = score;
+    scoreEl.className = 'risk-score';
+
+    const labelEl = document.getElementById('risk-label');
+
+    if (score >= 70 || critical > 0) {
+        scoreEl.classList.add('critical');
+        labelEl.textContent = 'Critical Risk';
+    } else if (score >= 40 || high > 0) {
+        scoreEl.classList.add('high');
+        labelEl.textContent = 'High Risk';
+    } else if (score >= 20) {
+        labelEl.textContent = 'Medium Risk';
+    } else {
+        labelEl.textContent = 'Low Risk';
+    }
+
+    document.getElementById('risk-critical').textContent = `${critical} Critical`;
+    document.getElementById('risk-high').textContent = `${high} High`;
+}
+
+async function loadRecentFindings() {
+    const container = document.getElementById('recent-findings-list');
+    if (!container) return;
+
+    try {
+        // Get recent scans first
+        const { scans } = await apiRequest('/scans?limit=5');
+        const findings = [];
+
+        // Fetch findings for each scan
+        for (const scan of scans.slice(0, 3)) {
+            try {
+                const scanData = await apiRequest(`/scans/${scan.id}`);
+                // Note: findings would need a dedicated endpoint, this is a simplified version
+                // We'll use the existing scan data if it has findings
+                if (scan.findings_count > 0) {
+                    findings.push({
+                        scan_id: scan.id,
+                        target: scan.target,
+                        severity: 'high',
+                        title: `${scan.findings_count} findings detected`,
+                        count: scan.findings_count
+                    });
+                }
+            } catch (e) {
+                // Ignore errors for individual scans
+            }
+        }
+
+        if (findings.length === 0) {
+            container.innerHTML = '<div class="empty-state-small">No findings yet. Run a scan to discover vulnerabilities.</div>';
+            return;
+        }
+
+        // Render findings (placeholder - would need actual findings endpoint)
+        container.innerHTML = findings.map(f => `
+            <div class="finding-item ${f.severity}" onclick="resumeScan('${f.scan_id}')">
+                <span class="finding-severity-badge ${f.severity}">${f.severity}</span>
+                <div class="finding-info">
+                    <div class="finding-title">${escapeHtml(f.title)}</div>
+                    <div class="finding-target">${escapeHtml(f.target)}</div>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (e) {
+        container.innerHTML = '<div class="empty-state-small">Unable to load findings</div>';
+    }
+}
+
+function addDashboardActivity(text, type = 'info') {
+    const feed = document.getElementById('dashboard-activity-feed');
+    if (!feed) return;
+
+    const icons = {
+        info: 'fa-info-circle',
+        success: 'fa-check-circle',
+        warning: 'fa-exclamation-triangle',
+        error: 'fa-times-circle'
+    };
+
+    const item = document.createElement('div');
+    item.className = `activity-item ${type}`;
+    item.innerHTML = `
+        <i class="fas ${icons[type] || icons.info} activity-icon"></i>
+        <span class="activity-text">${escapeHtml(text)}</span>
+        <span class="activity-time">Just now</span>
+    `;
+
+    feed.insertBefore(item, feed.firstChild);
+
+    // Keep only last 10 items
+    while (feed.children.length > 10) {
+        feed.removeChild(feed.lastChild);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ========== Scan Wizard ==========
@@ -757,7 +895,7 @@ async function executeChecks() {
                 // Log newly completed checks
                 if (completed > lastCompleted) {
                     for (let i = lastCompleted; i < completed && i < checkNames.length; i++) {
-                        addLogEntry(`✓ Completed: ${checkNames[i]}`, 'success');
+                        addLogEntry(`<i class="fas fa-check"></i> Completed: ${checkNames[i]}`, 'success');
                     }
                     lastCompleted = completed;
                 }
@@ -835,7 +973,7 @@ function displayResults(findings) {
     if (findings.length === 0) {
         container.innerHTML = `
             <div class="empty-state" style="color: var(--severity-low);">
-                ✓ No vulnerabilities found!
+                <i class="fas fa-check-circle"></i> No vulnerabilities found!
             </div>
         `;
         return;
@@ -1394,7 +1532,7 @@ async function loadSchedules() {
                 <tr>
                     <td colspan="6">
                         <div class="empty-state-enhanced">
-                            <div class="empty-state-icon">⏰</div>
+                            <div class="empty-state-icon"><i class="fas fa-clock"></i></div>
                             <h4>No scheduled scans</h4>
                             <p>Create a recurring scan using the form above.</p>
                         </div>
@@ -1506,7 +1644,7 @@ async function saveProfileChanges() {
             loadProfile();
         }
 
-        msgEl.innerHTML = '<span style="color: #00ff88;">✓ Profile updated successfully!</span>';
+        msgEl.innerHTML = '<span style="color: #00ff88;"><i class="fas fa-check"></i> Profile updated successfully!</span>';
         setTimeout(() => { msgEl.innerHTML = ''; }, 3000);
 
     } catch (error) {
@@ -1537,7 +1675,7 @@ async function changeUserPassword() {
 
         document.getElementById('current-password').value = '';
         document.getElementById('new-password').value = '';
-        msgEl.innerHTML = '<span style="color: #00ff88;">✓ Password changed successfully!</span>';
+        msgEl.innerHTML = '<span style="color: #00ff88;"><i class="fas fa-check"></i> Password changed successfully!</span>';
         setTimeout(() => { msgEl.innerHTML = ''; }, 3000);
 
     } catch (error) {
